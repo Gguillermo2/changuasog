@@ -3,6 +3,7 @@ import os
 import bcrypt
 from cryptography.fernet import Fernet
 from base64 import urlsafe_b64encode
+import random
 
 #-- CONFIGURACION DE RUTAS
 
@@ -85,6 +86,8 @@ def generate_strong_password(length: int = 12,
     password = ''.join(random.choice(characters) for i in range(length))
     return password
 
+def generate_2fa() -> str:
+    return "".join(str(random.randint(0,9)) for _ in range(5))
 
 
 
