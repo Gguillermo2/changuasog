@@ -1,16 +1,17 @@
 from pydantic import BaseModel
-
+from typing import Optional
 
 class AdminUser(BaseModel):
     username: str
-    ContresañUser: str
-    password_2fa: str | None = None
-
+    ContresañUser: str 
+    password_2fa: Optional[str] = None 
+   
+    fernet_key_salt: str
 
 class Login(BaseModel):
     Nombre_user: str
     password : str  
-    codigo : int | None = None
+    code : Optional[int] = None 
 
 
 class Cuentas(BaseModel):

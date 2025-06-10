@@ -1,67 +1,78 @@
-import random
 import os
 import bcrypt
-from cryptography.fernet import Fernet
-from base64 import urlsafe_b64encode
 import random
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.backends import default_backend
+from base64 import urlsafe_b64encode, urlsafe_b64decode
 
-#-- CONFIGURACION DE RUTAS
+# --- CONFIGURACION DE RUTAS (Aunque para Fernet ya no guardaremos la clave aquí)
+# RUTA_DBWROSER y KEY_FILE_PATH ya no son relevantes para la clave Fernet
+# si la derivamos de la contraseña maestra.
+# Sin embargo, mantenemos RUTA_DBWROSER porque allí se guardarán los JSON cifrados.
+RUTA_DBWROSER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "DBwroser")
 
-RUTA_DBWROSER =  os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "DBwroser" )
-KEY_FILE_NAME =  "fernet_key.key"
-KEY_FILE_PATH = os.path.join(RUTA_DBWROSER, KEY_FILE_NAME)
+# --- Funciones de Hashing con BCrypt (para la contraseña maestra del usuario)
+def hash_password_bcrypt(password: str) -> str:
+    """
+    Hashea una contraseña usando bcrypt.
+    """
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    return hashed.decode('utf-8')
 
-def hash_pasword_bcrypt(password: str) -> str:
-    hashhed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    return hashhed.decode('utf-8')
-
-def check_password_bcrypt(password: str,  hashed_password: str) -> bool:
+def check_password_bcrypt(password: str, hashed_password: str) -> bool:
+    """
+    Verifica una contraseña en texto plano contra un hash de bcrypt.
+    """
     return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
 
-
+# --- Gestión del directorio de la "DB"
 def _ensure_db_directory_exists():
+    """Asegura que el directorio DBwroser exista."""
     if not os.path.exists(RUTA_DBWROSER):
         os.makedirs(RUTA_DBWROSER)
 
-def generate_and_save_fernet_key():
-    """Genera una nueva clave Fernet y la guarda en un archivo."""
-    _ensure_db_directory_exists()
-    if not os.path.exists(KEY_FILE_PATH):
-        key = Fernet.generate_key()
-        with open(KEY_FILE_PATH, "wb") as keyfile:
-            keyfile.write(key)
-        print(f"Clave Fernet generada y guardada en: {KEY_FILE_PATH}")
-    else:
-        print(f"El archivo de clave Fernet ya existe en: {KEY_FILE_PATH}")
+# --- Derivación de Clave Fernet usando PBKDF2HMAC
+def generate_fernet_key_from_password(master_password: str, salt: bytes) -> bytes:
+    """
+    Deriva una clave Fernet a partir de una contraseña maestra y un salt usando PBKDF2HMAC.
+    """
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,  # Fernet keys are 32 bytes (256 bits)
+        salt=salt,
+        iterations=480000, # Un buen número de iteraciones para la seguridad actual
+        backend=default_backend()
+    )
+    key = urlsafe_b64encode(kdf.derive(master_password.encode('utf-8')))
+    return key
 
-def load_fernet_key() -> bytes:
-    """Carga la clave Fernet desde el archivo."""
-    _ensure_db_directory_exists() # Asegurar que el directorio exista antes de intentar leer
-    if not os.path.exists(KEY_FILE_PATH):
-        # Opcional: Generar y guardar si no existe, o lanzar un error si se espera que exista
-        generate_and_save_fernet_key()
-    
-    with open(KEY_FILE_PATH, "rb") as keyfile:
-        return keyfile.read()
-try:
-    _loaded_fernet_key = load_fernet_key()
-    cipher = Fernet(_loaded_fernet_key)
-except FileNotFoundError:
-    print("Advertencia: Clave Fernet no encontrada al iniciar seguridad.py. Asegúrate de generarla.")
-    cipher = None # O manejar el error de otra forma
+def generate_salt(length: int = 16) -> bytes:
+    """
+    Genera un salt aleatorio para PBKDF2HMAC. Este salt debe ser almacenado
+    junto con el usuario maestro (no secreto, pero único por usuario).
+    """
+    return os.urandom(length)
 
-def encrypt_data_fernet(data: str) -> str:
-    """Cifra una cadena de texto usando Fernet y retorna la cadena cifrada (base64)."""
-    if cipher is None:
-        raise ValueError("El objeto Fernet no está inicializado. Asegúrate de que la clave exista.")
+# --- Funciones de Cifrado y Descifrado con Fernet (ahora necesitan la clave activa)
+def encrypt_data_fernet(data: str, fernet_key: bytes) -> str:
+    """
+    Cifra una cadena de texto usando Fernet y la clave derivada.
+    Retorna la cadena cifrada (base64).
+    """
+    cipher = Fernet(fernet_key)
     return cipher.encrypt(data.encode('utf-8')).decode('utf-8')
 
-def decrypt_data_fernet(encrypted_data: str) -> str:
-    """Descifra una cadena cifrada con Fernet y retorna la cadena original."""
-    if cipher is None:
-        raise ValueError("El objeto Fernet no está inicializado. Asegúrate de que la clave exista.")
+def decrypt_data_fernet(encrypted_data: str, fernet_key: bytes) -> str:
+    """
+    Descifra una cadena cifrada con Fernet usando la clave derivada.
+    Retorna la cadena original.
+    """
+    cipher = Fernet(fernet_key)
     return cipher.decrypt(encrypted_data.encode('utf-8')).decode('utf-8')
 
+# --- Generación de Contraseñas Fuertes
 def generate_strong_password(length: int = 12,
                              use_uppercase: bool = True,
                              use_lowercase: bool = True,
@@ -86,14 +97,14 @@ def generate_strong_password(length: int = 12,
     password = ''.join(random.choice(characters) for i in range(length))
     return password
 
+# --- Generación de 2FA
 def generate_2fa() -> str:
+    """
+    Genera un código 2FA numérico de 5 dígitos.
+    """
     return "".join(str(random.randint(0,9)) for _ in range(5))
 
-
-
-
-
-
-
-
-
+# --- Eliminación de la inicialización global de Fernet y sus funciones de archivo
+# Las funciones generate_and_save_fernet_key y load_fernet_key,
+# así como la inicialización global de `cipher`, han sido eliminadas.
+# Ahora la clave se deriva bajo demanda cuando el usuario inicia sesión.
