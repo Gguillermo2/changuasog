@@ -19,14 +19,14 @@ def iniciar_aplicacion():
         if admin_user.password_2fa: # Solo si tiene 2FA configurado
             if verificar_2fa(admin_user):
                 print("Verificación 2FA exitosa. Puedes acceder a funciones sensibles.")
-                # Puedes generar el código 2FA aquí si lo necesitas
+                #  generar el código 2FA aquí si lo necesitas
                 # code_2fa = autenticacion.obtener_codigo_2fa()
             else:
                 print("Verificación 2FA fallida. Acceso restringido a funciones sensibles.")
                 # Podrías salir o limitar funcionalidades
                 return
 
-        # A partir de aquí, puedes cargar y mostrar las cuentas
+        # A partir de aquí, se podria  cargar y mostrar las cuentas
         # (pasando `session_fernet_key` a las funciones de `almacenamiento`)
         # from core.almacenamiento import load_accounts_encrypted # Suponiendo que la crees
         # cuentas = load_accounts_encrypted("cuentas.json", session_fernet_key)

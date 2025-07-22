@@ -3,9 +3,9 @@ from typing import Optional
 
 class AdminUser(BaseModel):
     username: str
-    ContresañUser: str 
+    password: str 
     password_2fa: Optional[str] = None 
-   
+
     fernet_key_salt: str
 
 class Login(BaseModel):
@@ -14,8 +14,17 @@ class Login(BaseModel):
     code : Optional[int] = None 
 
 
-class Cuentas(BaseModel):
-    plataforma: str
-    correo_o_usuario : str
-    contraseña : str
+class Account(BaseModel):  # Mejor nombre en inglés
+    platform: str
+    email_or_username: str
+    password: str
+    category: str  # Nueva: videojuegos, correo, streaming, productividad
+    notes: Optional[str] = None  # Para notas adicionales
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
+class TwoFactorCode(BaseModel):
+    code: str
+    created_at: float  # timestamp
+    expires_at: float  # timestamp
+    is_used: bool = False
