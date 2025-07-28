@@ -104,7 +104,3 @@ def generate_2fa() -> str:
     """
     return "".join(str(random.randint(0,9)) for _ in range(5))
 
-# --- Eliminación de la inicialización global de Fernet y sus funciones de archivo
-# Las funciones generate_and_save_fernet_key y load_fernet_key,
-# así como la inicialización global de `cipher`, han sido eliminadas.
-# Ahora la clave se deriva bajo demanda cuando el usuario inicia sesión.

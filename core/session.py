@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
+from Modelo.models import AdminUser
+
 class SessionManager:
     def __init__(self):
         self.current_user: Optional[AdminUser] = None

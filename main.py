@@ -1,39 +1,22 @@
-from core.autenticacion import autenticar_admin, generar_Admin,verificar_2fa
+# main.py
+import sys
+import os
 
-def iniciar_aplicacion():
-    # 1. Asegurarse de que el directorio DBwroser exista (se puede mover a un inicio global)
-    # seguridad._ensure_db_directory_exists() # Llamar una vez al inicio de la app
+# Agregar el directorio raíz al path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-    # 2. Gestionar el usuario administrador
-    generar_Admin() # Se encargará de crearlo si no existe
+from Vista.login import start_login
+from Vista.home import start_home
 
-    # 3. Intentar autenticar al usuario maestro
-    admin_user, session_fernet_key = autenticar_admin()
-
-    if admin_user and session_fernet_key:
-        print("Acceso concedido al gestor de contraseñas.")
-        # Aquí la `session_fernet_key` es tu "llave" para la sesión.
-        # Pásala a las funciones de almacenamiento/gestión de cuentas.
-
-        # Opcional: Proceso de 2FA
-        if admin_user.password_2fa: # Solo si tiene 2FA configurado
-            if verificar_2fa(admin_user):
-                print("Verificación 2FA exitosa. Puedes acceder a funciones sensibles.")
-                #  generar el código 2FA aquí si lo necesitas
-                # code_2fa = autenticacion.obtener_codigo_2fa()
-            else:
-                print("Verificación 2FA fallida. Acceso restringido a funciones sensibles.")
-                # Podrías salir o limitar funcionalidades
-                return
-
-        # A partir de aquí, se podria  cargar y mostrar las cuentas
-        # (pasando `session_fernet_key` a las funciones de `almacenamiento`)
-        # from core.almacenamiento import load_accounts_encrypted # Suponiendo que la crees
-        # cuentas = load_accounts_encrypted("cuentas.json", session_fernet_key)
-        # ... lógica de la GUI ...
-
-    else:
-        print("Fallo en la autenticación. Saliendo.")
+def main():
+    """Función principal que inicia la aplicación"""
+    # Callback que se ejecuta cuando el login es exitoso
+    def on_login_success(admin_user, fernet_key):
+        # Iniciar la ventana principal
+        start_home(admin_user, fernet_key)
+    
+    # Iniciar con la ventana de login
+    start_login(on_login_success)
 
 if __name__ == "__main__":
-    iniciar_aplicacion()
+    main()
