@@ -8,91 +8,84 @@ from core.seguridad import _ensure_db_directory_exists as ensure_db_directory_E
 RUTA_DBWROSER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "DBwroser")
 PASSWORDS_DATA_FILE = "passwords_data.json"
 
-def save_jsonD(filename: str, data: dict):
+def save_json_encrypted(filename: str, data: dict, fernet_key: bytes):
     """
-    Guarda datos en un archivo JSON en el directorio DBwroser.
+    Guarda datos en un archivo JSON encriptado completamente
     """
     ensure_db_directory_E()
     full_path = os.path.join(RUTA_DBWROSER, filename)
     try:
-        with open(full_path, "w", encoding="utf-8") as file:
-            json.dump(data, file, indent=4, ensure_ascii=False)
-        print(f"✅ Datos guardados correctamente en {filename}") 
-    except IOError as e:
-        print(f"❌ Error al guardar datos en {full_path}: {e}")
+        # Convertir datos a JSON string y luego a bytes
+        json_str = json.dumps(data, ensure_ascii=False)
+        json_bytes = json_str.encode('utf-8')
+        
+        # Encriptar todo el contenido
+        encrypted_data = encrypt_data_fernet(json_bytes, fernet_key)
+        
+        # Guardar los bytes encriptados (no como JSON)
+        with open(full_path, "wb") as file:
+            file.write(encrypted_data)
+        print(f"✅ Datos encriptados guardados correctamente en {filename}") 
+    except Exception as e:
+        print(f"❌ Error al guardar/encriptar datos en {full_path}: {e}")
 
-def load_json_data(filename: str) -> Optional[Dict]:
-    """Carga datos de un archivo JSON desde DBwroser."""
+def load_json_encrypted(filename: str, fernet_key: bytes) -> Optional[Dict]:
+    """Carga y desencripta un archivo JSON encriptado"""
     full_path = os.path.join(RUTA_DBWROSER, filename)
     if os.path.exists(full_path):
         try:
-            with open(full_path, "r", encoding="utf-8") as file:
-                return json.load(file)
-        except json.JSONDecodeError as e:
-            print(f"❌ Error al decodificar JSON de {full_path}: {e}")
+            # Leer datos encriptados como bytes
+            with open(full_path, "rb") as file:
+                encrypted_data = file.read()
+            
+            # Desencriptar
+            decrypted_data = decrypt_data_fernet(encrypted_data, fernet_key)
+            
+            # Convertir de bytes a JSON
+            return json.loads(decrypted_data.decode('utf-8'))
+        except Exception as e:
+            print(f"❌ Error al desencriptar/decodificar {full_path}: {e}")
             return None
-        except IOError as e:
-            print(f"❌ Error al cargar datos de {full_path}: {e}")
-            return None
-    return None   
+    return None
 
 def save_accounts_data(accounts: List[Account], fernet_key: bytes):
     """
-    Cifra y guarda los datos de las cuentas en el archivo JSON.
-    Requiere la clave Fernet activa de la sesión.
+    Cifra y guarda los datos de las cuentas en el archivo JSON completamente encriptado
     """
     ensure_db_directory_E()
     
-    encrypted_data = []
+    accounts_data = []
     for account in accounts:
         try:
-            # Cifrar la contraseña
-            encrypted_password = encrypt_data_fernet(account.password, fernet_key)
-            
             # Crear diccionario con todos los campos
             account_dict = account.model_dump()
-            account_dict['password'] = encrypted_password
-            
-            encrypted_data.append(account_dict)
-            
+            accounts_data.append(account_dict)
         except Exception as e:
-            print(f"❌ Error al cifrar la cuenta {account.platform}: {e}")
+            print(f"❌ Error al procesar la cuenta {account.platform}: {e}")
             continue
 
-    save_jsonD(PASSWORDS_DATA_FILE, {"accounts": encrypted_data})
-    print("✅ Cuentas guardadas y cifradas exitosamente.")
+    # Guardar todo el JSON encriptado
+    save_json_encrypted(PASSWORDS_DATA_FILE, {"accounts": accounts_data}, fernet_key)
+    print("✅ Cuentas guardadas en archivo completamente encriptado.")
 
 def load_accounts_data(fernet_key: bytes) -> List[Account]:
     """
-    Carga y descifra los datos de las cuentas desde el archivo JSON.
-    Requiere la clave Fernet activa de la sesión.
+    Carga y descifra los datos de las cuentas desde el archivo JSON encriptado
     """
     ensure_db_directory_E()
 
-    data = load_json_data(PASSWORDS_DATA_FILE)
+    data = load_json_encrypted(PASSWORDS_DATA_FILE, fernet_key)
     if not data or "accounts" not in data:
         print("ℹ️  No se encontraron datos de cuentas.")
         return []
 
-    decrypted_accounts = []
-    for encrypted_account_dict in data.get("accounts", []):
+    accounts = []
+    for account_dict in data.get("accounts", []):
         try:
-            # Descifrar la contraseña
-            encrypted_password = encrypted_account_dict.get('password')
-            if encrypted_password:
-                decrypted_password = decrypt_data_fernet(encrypted_password, fernet_key)
-                
-                # Reconstruir el diccionario para el modelo
-                account_data = encrypted_account_dict.copy()
-                account_data['password'] = decrypted_password
-                
-                decrypted_accounts.append(Account(**account_data))
-            else:
-                print(f"⚠️  Contraseña vacía para: {encrypted_account_dict.get('platform', 'Desconocida')}")
-                
+            accounts.append(Account(**account_dict))
         except Exception as e:
-            print(f"❌ Error al descifrar cuenta {encrypted_account_dict.get('platform', 'Desconocida')}: {e}")
+            print(f"❌ Error al procesar cuenta {account_dict.get('platform', 'Desconocida')}: {e}")
             continue
             
-    print(f"✅ {len(decrypted_accounts)} cuenta(s) cargadas exitosamente.")
-    return decrypted_accounts
+    print(f"✅ {len(accounts)} cuenta(s) cargadas exitosamente.")
+    return accounts
