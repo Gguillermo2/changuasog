@@ -2,7 +2,7 @@ import os
 import json
 from typing import List, Dict, Optional
 from core.seguridad import encrypt_data_fernet, decrypt_data_fernet 
-from Modelo.models import Account  # Cambiado de Cuentas
+from Modelo.models import Account 
 from core.seguridad import _ensure_db_directory_exists as ensure_db_directory_E
 
 RUTA_DBWROSER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "DBwroser")

@@ -65,7 +65,7 @@ def autenticar_admin() -> tuple[AdminUser | None, bytes | None]:
     password_ingresada = getpass.getpass("Ingrese su contraseña maestra: ")
 
     if nombre_ingresado == admin_user.username and \
-       check_password_bcrypt(password_ingresada, admin_user.ContresañUser):
+       check_password_bcrypt(password_ingresada, admin_user.password):
         print("¡Autenticación de contraseña maestra exitosa!")
         
         # --- NUEVO: Derivar la clave Fernet ---
