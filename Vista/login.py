@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.autenticacion import autenticar_admin, verificar_2fa, obtener_codigo_2fa, generar_Admin
-from core.almacenamiento import load_json_data
+from core.almacenamiento import load_encrypted_json
 
 class LoginWindow:
     def __init__(self, on_success_callback):
@@ -48,7 +48,8 @@ class LoginWindow:
     
     def check_admin_exists(self):
         """Verifica si existe un usuario administrador"""
-        return load_json_data("DBusers.json") is not None
+        from core.almacenamiento import check_admin_exists
+        return check_admin_exists()
     
     def clear_window(self):
         """Limpia todos los widgets de la ventana"""
@@ -129,6 +130,9 @@ class LoginWindow:
             fernet_salt_bytes = generate_salt()
             fernet_salt_str = urlsafe_b64encode(fernet_salt_bytes).decode('utf-8')
             
+            # Derivar clave Fernet
+            fernet_key = generate_fernet_key_from_password(password, fernet_salt_bytes)
+            
             # Crear usuario
             nuevo_admin = AdminUser(
                 username=username,
@@ -137,8 +141,13 @@ class LoginWindow:
                 fernet_key_salt=fernet_salt_str
             )
             
-            # Guardar
-            save_jsonD("DBusers.json", nuevo_admin.model_dump())
+            # Guardar salt por separado
+            from core.autenticacion import save_admin_salt
+            save_admin_salt(fernet_salt_bytes)
+            
+            # Guardar datos encriptados
+            from core.almacenamiento import save_admin_data
+            save_admin_data(nuevo_admin.model_dump(), fernet_key)
             
             messagebox.showinfo("Éxito", "Usuario administrador creado correctamente")
             self.show_login_screen()

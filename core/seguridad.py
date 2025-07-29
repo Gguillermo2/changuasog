@@ -7,10 +7,6 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 
-# --- CONFIGURACION DE RUTAS (Aunque para Fernet ya no guardaremos la clave aquí)
-# RUTA_DBWROSER y KEY_FILE_PATH ya no son relevantes para la clave Fernet
-# si la derivamos de la contraseña maestra.
-# Sin embargo, mantenemos RUTA_DBWROSER porque allí se guardarán los JSON cifrados.
 RUTA_DBWROSER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "DBwroser")
 
 # --- Funciones de Hashing con BCrypt (para la contraseña maestra del usuario)
@@ -42,7 +38,7 @@ def generate_fernet_key_from_password(master_password: str, salt: bytes) -> byte
         algorithm=hashes.SHA256(),
         length=32,  # Fernet keys are 32 bytes (256 bits)
         salt=salt,
-        iterations=480000, # Un buen número de iteraciones para la seguridad actual
+        iterations=480000, 
         backend=default_backend()
     )
     key = urlsafe_b64encode(kdf.derive(master_password.encode('utf-8')))
