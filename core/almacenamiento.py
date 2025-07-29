@@ -1,80 +1,80 @@
+# core/almacenamiento.py
 import os
 import json
 from typing import List, Dict, Optional
-from core.seguridad import encrypt_data_fernet, decrypt_data_fernet 
-from Modelo.models import Account 
-from core.seguridad import _ensure_db_directory_exists as ensure_db_directory_E
+from core.seguridad import encrypt_data_fernet, decrypt_data_fernet, _ensure_db_directory_exists as ensure_db_directory_E
+from Modelo.models import Account
 
 RUTA_DBWROSER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "DBwroser")
-PASSWORDS_DATA_FILE = "passwords_data.json"
+PASSWORDS_DATA_FILE = "passwords_data.enc"  # .enc para indicar que está encriptado
+ADMIN_DATA_FILE = "DBusers.enc"  # También encriptado
 
-def save_json_encrypted(filename: str, data: dict, fernet_key: bytes):
+def save_encrypted_json(filename: str, data: dict, fernet_key: bytes):
     """
-    Guarda datos en un archivo JSON encriptado completamente
+    Guarda datos en un archivo completamente encriptado
     """
     ensure_db_directory_E()
     full_path = os.path.join(RUTA_DBWROSER, filename)
     try:
-        # Convertir datos a JSON string y luego a bytes
-        json_str = json.dumps(data, ensure_ascii=False)
-        json_bytes = json_str.encode('utf-8')
+        # Convertir datos a JSON string
+        json_str = json.dumps(data, indent=4, ensure_ascii=False)
         
         # Encriptar todo el contenido
-        encrypted_data = encrypt_data_fernet(json_bytes, fernet_key)
+        encrypted_data = encrypt_data_fernet(json_str, fernet_key)
         
-        # Guardar los bytes encriptados (no como JSON)
-        with open(full_path, "wb") as file:
+        # Guardar como archivo binario encriptado
+        with open(full_path, "w", encoding='utf-8') as file:
             file.write(encrypted_data)
-        print(f"✅ Datos encriptados guardados correctamente en {filename}") 
+            
+        print(f"✅ Archivo completamente encriptado guardado: {filename}") 
     except Exception as e:
         print(f"❌ Error al guardar/encriptar datos en {full_path}: {e}")
+        raise
 
-def load_json_encrypted(filename: str, fernet_key: bytes) -> Optional[Dict]:
-    """Carga y desencripta un archivo JSON encriptado"""
+def load_encrypted_json(filename: str, fernet_key: bytes) -> Optional[Dict]:
+    """
+    Carga y desencripta un archivo JSON completamente encriptado
+    """
     full_path = os.path.join(RUTA_DBWROSER, filename)
-    if os.path.exists(full_path):
-        try:
-            # Leer datos encriptados como bytes
-            with open(full_path, "rb") as file:
-                encrypted_data = file.read()
-            
-            # Desencriptar
-            decrypted_data = decrypt_data_fernet(encrypted_data, fernet_key)
-            
-            # Convertir de bytes a JSON
-            return json.loads(decrypted_data.decode('utf-8'))
-        except Exception as e:
-            print(f"❌ Error al desencriptar/decodificar {full_path}: {e}")
-            return None
-    return None
+    if not os.path.exists(full_path):
+        return None
+        
+    try:
+        # Leer el archivo encriptado
+        with open(full_path, "r", encoding='utf-8') as file:
+            encrypted_data = file.read()
+        
+        # Desencriptar
+        decrypted_json = decrypt_data_fernet(encrypted_data, fernet_key)
+        
+        # Convertir de JSON string a diccionario
+        return json.loads(decrypted_json)
+    except Exception as e:
+        print(f"❌ Error al desencriptar/decodificar {full_path}: {e}")
+        return None
 
+# Funciones específicas para cuentas
 def save_accounts_data(accounts: List[Account], fernet_key: bytes):
     """
-    Cifra y guarda los datos de las cuentas en el archivo JSON completamente encriptado
+    Guarda todas las cuentas en un archivo completamente encriptado
     """
-    ensure_db_directory_E()
-    
     accounts_data = []
     for account in accounts:
         try:
-            # Crear diccionario con todos los campos
             account_dict = account.model_dump()
             accounts_data.append(account_dict)
         except Exception as e:
             print(f"❌ Error al procesar la cuenta {account.platform}: {e}")
             continue
 
-    # Guardar todo el JSON encriptado
-    save_json_encrypted(PASSWORDS_DATA_FILE, {"accounts": accounts_data}, fernet_key)
-    print("✅ Cuentas guardadas en archivo completamente encriptado.")
+    save_encrypted_json(PASSWORDS_DATA_FILE, {"accounts": accounts_data}, fernet_key)
+    print(f"✅ {len(accounts_data)} cuenta(s) guardadas en archivo encriptado.")
 
 def load_accounts_data(fernet_key: bytes) -> List[Account]:
     """
-    Carga y descifra los datos de las cuentas desde el archivo JSON encriptado
+    Carga todas las cuentas desde el archivo encriptado
     """
-    ensure_db_directory_E()
-
-    data = load_json_encrypted(PASSWORDS_DATA_FILE, fernet_key)
+    data = load_encrypted_json(PASSWORDS_DATA_FILE, fernet_key)
     if not data or "accounts" not in data:
         print("ℹ️  No se encontraron datos de cuentas.")
         return []
@@ -84,8 +84,28 @@ def load_accounts_data(fernet_key: bytes) -> List[Account]:
         try:
             accounts.append(Account(**account_dict))
         except Exception as e:
-            print(f"❌ Error al procesar cuenta {account_dict.get('platform', 'Desconocida')}: {e}")
+            print(f"❌ Error al cargar cuenta: {e}")
             continue
             
-    print(f"✅ {len(accounts)} cuenta(s) cargadas exitosamente.")
+    print(f"✅ {len(accounts)} cuenta(s) cargadas desde archivo encriptado.")
     return accounts
+
+# Funciones para el usuario administrador
+def save_admin_data(admin_data: dict, fernet_key: bytes):
+    """
+    Guarda los datos del administrador encriptados
+    """
+    save_encrypted_json(ADMIN_DATA_FILE, admin_data, fernet_key)
+
+def load_admin_data(fernet_key: bytes) -> Optional[Dict]:
+    """
+    Carga los datos del administrador
+    """
+    return load_encrypted_json(ADMIN_DATA_FILE, fernet_key)
+
+def check_admin_exists() -> bool:
+    """
+    Verifica si existe un archivo de administrador (sin necesidad de desencriptar)
+    """
+    full_path = os.path.join(RUTA_DBWROSER, ADMIN_DATA_FILE)
+    return os.path.exists(full_path)
