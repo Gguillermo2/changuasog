@@ -614,7 +614,7 @@ class HomeWindow:
         tk.Label(main_frame, text="Categoría:", bg='#1e1e1e', fg='white',
                 font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
         
-        categories = ["videojuegos", "correo", "streaming", "productividad", "otros"]
+        categories = ["Entretenimiento", "Financiero", "Productividad", "Educativo", "otros"]
         category_var = tk.StringVar(value=categories[0])
         
         category_frame = tk.Frame(main_frame, bg='#1e1e1e')
@@ -760,7 +760,7 @@ class HomeWindow:
         tk.Label(main_frame, text="Categoría:", bg='#1e1e1e', fg='white',
                 font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
         
-        categories = ["videojuegos", "correo", "streaming", "productividad", "otros"]
+        categories = ["Entretenimiento", "Financiero", "Productividad", "Educativo", "otros"]
         category_var = tk.StringVar(value=self.selected_account.category)
         
         category_combo = ttk.Combobox(main_frame,

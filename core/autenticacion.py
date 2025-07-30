@@ -1,3 +1,4 @@
+#core/autenticacion.py
 import getpass
 from Modelo.models import AdminUser
 # Importar las nuevas funciones de seguridad

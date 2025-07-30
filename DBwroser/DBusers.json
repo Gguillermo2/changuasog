@@ -1,6 +1,6 @@
 {
     "username": "mameluco69",
-    "password": "$2b$12$bofzZaRp1e8KtW/YxSd95.1cEiB2VIpDjbronOEICIEvQGvc7cCIW",
-    "password_2fa": "$2b$12$tSeA/xTZeOcYi16oagPqcenjdDUMB8cm4ir2maEIZRp2oFGxbzPXi",
-    "fernet_key_salt": "57v9od9Xi2x-viAtJr_0uw=="
+    "password": "$2b$12$P8PtExNi5sbzMHFi/w5u3eOVcjEh64NU73PTZ76u/bKqmw9ukXkXO",
+    "password_2fa": "$2b$12$KOzdQ8l55z/qEsuf5BxJiu3bMxTiR0Hev4XsOZicYOX4hKVlg54Gu",
+    "fernet_key_salt": "6yzuMtmLqklxqyIsbffotA=="
 }
