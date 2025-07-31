@@ -1,1008 +1,1086 @@
-# Vista/home.py
-import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+# views/home.py - Versión PySide6
 import sys
 import os
 from datetime import datetime
+import json
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                               QHBoxLayout, QLabel, QLineEdit, QPushButton, 
+                               QFrame, QTableWidget, QTableWidgetItem, QHeaderView,
+                               QStackedWidget, QMessageBox, QSpacerItem, QComboBox,
+                               QSizePolicy, QGraphicsDropShadowEffect, QTextEdit,
+                               QDialog, QDialogButtonBox, QGridLayout, QMenu,
+                               QAbstractItemView, QStyledItemDelegate)
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QRect, Signal, QSize
+from PySide6.QtGui import QFont, QColor, QIcon, QPainter, QPen, QBrush, QAction
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.account_manager import AccountManager
-from core.session import SessionManager
-from Modelo.models import AdminUser
+from Modelo.models import Account
 
-class HomeWindow:
-    def __init__(self, admin_user: AdminUser, fernet_key: bytes):
-        self.root = tk.Tk()
-        self.root.title("Gestor de Contraseñas - Panel Principal")
-        self.root.geometry("1000x700")
-        self.root.minsize(800, 600)
+
+class ModernLineEdit(QLineEdit):
+    """LineEdit personalizado con estilo moderno"""
+    def __init__(self, placeholder="", is_password=False):
+        super().__init__()
+        self.setPlaceholderText(placeholder)
+        if is_password:
+            self.setEchoMode(QLineEdit.EchoMode.Password)
         
-        # Datos de sesión
-        self.admin_user = admin_user
-        self.fernet_key = fernet_key
-        self.session_manager = SessionManager()
-        self.session_manager.start_session(admin_user, fernet_key)
+        self.setStyleSheet("""
+            QLineEdit {
+                background-color: #2d2d2d;
+                color: white;
+                border: 2px solid #404040;
+                border-radius: 8px;
+                padding: 12px 15px;
+                font-size: 14px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QLineEdit:focus {
+                border-color: #0d7377;
+                background-color: #333333;
+            }
+            QLineEdit:hover {
+                border-color: #555555;
+            }
+        """)
+        self.setMinimumHeight(45)
+
+
+class ModernTextEdit(QTextEdit):
+    """TextEdit personalizado con estilo moderno"""
+    def __init__(self, placeholder=""):
+        super().__init__()
+        self.setPlaceholderText(placeholder)
         
-        # Gestor de cuentas
-        self.account_manager = AccountManager(fernet_key)
+        self.setStyleSheet("""
+            QTextEdit {
+                background-color: #2d2d2d;
+                color: white;
+                border: 2px solid #404040;
+                border-radius: 8px;
+                padding: 12px 15px;
+                font-size: 14px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QTextEdit:focus {
+                border-color: #0d7377;
+                background-color: #333333;
+            }
+            QTextEdit:hover {
+                border-color: #555555;
+            }
+        """)
+        self.setMaximumHeight(100)
+
+
+class ModernComboBox(QComboBox):
+    """ComboBox personalizado con estilo moderno"""
+    def __init__(self):
+        super().__init__()
         
-        # Variables de control
-        self.selected_account = None
-        self.show_passwords = tk.BooleanVar(value=False)
+        self.setStyleSheet("""
+            QComboBox {
+                background-color: #2d2d2d;
+                color: white;
+                border: 2px solid #404040;
+                border-radius: 8px;
+                padding: 12px 15px;
+                font-size: 14px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                min-height: 45px;
+            }
+            QComboBox:hover {
+                border-color: #555555;
+            }
+            QComboBox:focus {
+                border-color: #0d7377;
+                background-color: #333333;
+            }
+            QComboBox::drop-down {
+                border: none;
+                padding-right: 20px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #0d7377;
+                margin-right: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2d2d2d;
+                color: white;
+                selection-background-color: #0d7377;
+                border: 2px solid #404040;
+                border-radius: 8px;
+                padding: 5px;
+            }
+        """)
+
+
+class ModernButton(QPushButton):
+    """Botón personalizado con estilo moderno"""
+    def __init__(self, text, style_type="primary", icon_text=""):
+        super().__init__()
         
-        # Configurar estilo
-        self.setup_styles()
+        if icon_text:
+            self.setText(f"{icon_text} {text}")
+        else:
+            self.setText(text)
         
-        # Crear interfaz
-        self.create_widgets()
+        base_style = """
+            QPushButton {
+                border: none;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: bold;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+        """
         
-        # Cargar cuentas
-        self.refresh_accounts_list()
+        if style_type == "primary":
+            self.setStyleSheet(base_style + """
+                QPushButton {
+                    background-color: #0d7377;
+                    color: white;
+                }
+                QPushButton:hover {
+                    background-color: #0a5d61;
+                }
+                QPushButton:pressed {
+                    background-color: #084a4d;
+                }
+            """)
+        elif style_type == "success":
+            self.setStyleSheet(base_style + """
+                QPushButton {
+                    background-color: #14ae5c;
+                    color: white;
+                }
+                QPushButton:hover {
+                    background-color: #119950;
+                }
+                QPushButton:pressed {
+                    background-color: #0e7d42;
+                }
+            """)
+        elif style_type == "danger":
+            self.setStyleSheet(base_style + """
+                QPushButton {
+                    background-color: #dc3545;
+                    color: white;
+                }
+                QPushButton:hover {
+                    background-color: #c82333;
+                }
+                QPushButton:pressed {
+                    background-color: #bd2130;
+                }
+            """)
+        elif style_type == "secondary":
+            self.setStyleSheet(base_style + """
+                QPushButton {
+                    background-color: #404040;
+                    color: white;
+                }
+                QPushButton:hover {
+                    background-color: #555555;
+                }
+                QPushButton:pressed {
+                    background-color: #333333;
+                }
+            """)
         
-        # Verificar sesión periódicamente
-        self.check_session()
+        self.setMinimumHeight(45)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        # Agregar sombra
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(10)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
+
+
+class CategoryDelegate(QStyledItemDelegate):
+    """Delegado personalizado para mostrar categorías con colores"""
     
-    def setup_styles(self):
-        """Configura los estilos de la aplicación"""
-        self.root.configure(bg='#1e1e1e')
-        
-        style = ttk.Style()
-        style.theme_use('clam')
-        
-        # Configurar colores generales
-        style.configure('.',
-                       background='#1e1e1e',
-                       foreground='white',
-                       borderwidth=0,
-                       focuscolor='none')
-        
-        # Treeview
-        style.configure('Treeview',
-                       background='#2d2d2d',
-                       foreground='white',
-                       rowheight=25,
-                       fieldbackground='#2d2d2d',
-                       borderwidth=0)
-        style.map('Treeview',
-                 background=[('selected', '#0d7377')])
-        
-        # Headers
-        style.configure('Treeview.Heading',
-                       background='#252525',
-                       foreground='white',
-                       relief='flat')
-        
-        # Labels
-        style.configure('Title.TLabel',
-                       font=('Arial', 14, 'bold'))
-        style.configure('Subtitle.TLabel',
-                       font=('Arial', 11))
+    CATEGORY_COLORS = {
+        "Personal": "#0d7377",
+        "Trabajo": "#14ae5c",
+        "Redes Sociales": "#3b82f6",
+        "Entretenimiento": "#8b5cf6",
+        "Finanzas": "#f59e0b",
+        "Educación": "#ec4899",
+        "Otros": "#6b7280"
+    }
     
-    def create_widgets(self):
-        """Crea todos los widgets de la interfaz"""
-        # Frame superior (header)
-        self.create_header()
+    def paint(self, painter, option, index):
+        if index.column() == 4:  # Columna de categoría
+            painter.save()
+            
+            # Obtener el texto de la categoría
+            category = index.data()
+            color = self.CATEGORY_COLORS.get(category, "#6b7280")
+            
+            # Dibujar fondo de la celda
+            if option.state & option.State_Selected:
+                painter.fillRect(option.rect, QColor("#0d7377"))
+            
+            # Crear rectángulo para el badge
+            badge_rect = QRect(
+                option.rect.x() + 10,
+                option.rect.y() + 10,
+                option.rect.width() - 20,
+                option.rect.height() - 20
+            )
+            
+            # Dibujar el badge
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor(color)))
+            painter.drawRoundedRect(badge_rect, 4, 4)
+            
+            # Dibujar el texto
+            painter.setPen(QPen(QColor("white")))
+            painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, category)
+            
+            painter.restore()
+        else:
+            super().paint(painter, option, index)
+
+
+class AccountDialog(QDialog):
+    """Diálogo para agregar/editar cuentas"""
+    def __init__(self, parent=None, account=None):
+        super().__init__(parent)
+        self.account = account
+        self.setWindowTitle("Editar Cuenta" if account else "Nueva Cuenta")
+        self.setFixedSize(500, 600)
+        self.setModal(True)
         
-        # Frame principal con dos paneles
-        main_container = tk.Frame(self.root, bg='#1e1e1e')
-        main_container.pack(fill='both', expand=True, padx=10, pady=5)
+        self.setup_ui()
         
-        # Panel izquierdo (lista de cuentas)
-        self.create_left_panel(main_container)
-        
-        # Panel derecho (detalles y acciones)
-        self.create_right_panel(main_container)
-        
-        # Barra de estado
-        self.create_status_bar()
+        if account:
+            self.load_account_data()
     
-    def create_header(self):
-        """Crea el header de la aplicación"""
-        header_frame = tk.Frame(self.root, bg='#0d7377', height=60)
-        header_frame.pack(fill='x')
-        header_frame.pack_propagate(False)
+    def setup_ui(self):
+        """Configura la interfaz del diálogo"""
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+            }
+            QLabel {
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                margin-top: 10px;
+            }
+        """)
         
-        # Contenedor interno
-        inner_header = tk.Frame(header_frame, bg='#0d7377')
-        inner_header.pack(expand=True, fill='both', padx=20)
-        
-        # Título y usuario
-        left_frame = tk.Frame(inner_header, bg='#0d7377')
-        left_frame.pack(side='left', fill='y')
-        
-        tk.Label(left_frame,
-                text="🔐 Gestor de Contraseñas",
-                bg='#0d7377',
-                fg='white',
-                font=('Arial', 16, 'bold')).pack(side='left', pady=15)
-        
-        # Info de usuario y botón de logout
-        right_frame = tk.Frame(inner_header, bg='#0d7377')
-        right_frame.pack(side='right', fill='y')
-        
-        user_info = tk.Frame(right_frame, bg='#0d7377')
-        user_info.pack(side='left', padx=20, pady=15)
-        
-        tk.Label(user_info,
-                text=f"👤 {self.admin_user.username}",
-                bg='#0d7377',
-                fg='white',
-                font=('Arial', 11)).pack()
-        
-        logout_btn = tk.Button(right_frame,
-                              text="Cerrar Sesión",
-                              command=self.logout,
-                              bg='#d32f2f',
-                              fg='white',
-                              font=('Arial', 10),
-                              padx=15,
-                              pady=5,
-                              cursor='hand2',
-                              relief='flat')
-        logout_btn.pack(side='right', pady=15)
-    
-    def create_left_panel(self, parent):
-        """Crea el panel izquierdo con la lista de cuentas"""
-        left_frame = tk.Frame(parent, bg='#252525', width=400)
-        left_frame.pack(side='left', fill='both', expand=True, padx=(0, 5))
-        left_frame.pack_propagate(False)
-        
-        # Título y controles
-        controls_frame = tk.Frame(left_frame, bg='#252525')
-        controls_frame.pack(fill='x', padx=10, pady=10)
-        
-        ttk.Label(controls_frame,
-                 text="Cuentas Guardadas",
-                 style='Title.TLabel').pack(side='left')
-        
-        # Botón agregar
-        add_btn = tk.Button(controls_frame,
-                           text="+ Nueva",
-                           command=self.show_add_account_dialog,
-                           bg='#14ae5c',
-                           fg='white',
-                           font=('Arial', 10),
-                           padx=15,
-                           pady=5,
-                           cursor='hand2',
-                           relief='flat')
-        add_btn.pack(side='right')
-        
-        # Búsqueda
-        search_frame = tk.Frame(left_frame, bg='#252525')
-        search_frame.pack(fill='x', padx=10, pady=(0, 10))
-        
-        self.search_var = tk.StringVar()
-        self.search_var.trace('w', lambda *args: self.filter_accounts())
-        
-        search_entry = ttk.Entry(search_frame,
-                                textvariable=self.search_var,
-                                font=('Arial', 11))
-        search_entry.pack(side='left', fill='x', expand=True, padx=(0, 10))
-        
-        # Filtro por categoría
-        self.category_var = tk.StringVar(value="Todas")
-        categories = ["Todas"] + self.account_manager.get_all_categories()
-        
-        category_combo = ttk.Combobox(search_frame,
-                                     textvariable=self.category_var,
-                                     values=categories,
-                                     state='readonly',
-                                     width=15)
-        category_combo.pack(side='right')
-        category_combo.bind('<<ComboboxSelected>>', lambda e: self.filter_accounts())
-        
-        # Lista de cuentas (Treeview)
-        tree_frame = tk.Frame(left_frame, bg='#252525')
-        tree_frame.pack(fill='both', expand=True, padx=10, pady=(0, 10))
-        
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(tree_frame)
-        scrollbar.pack(side='right', fill='y')
-        
-        # Treeview
-        self.accounts_tree = ttk.Treeview(tree_frame,
-                                         columns=('Usuario', 'Categoría'),
-                                         show='tree headings',
-                                         yscrollcommand=scrollbar.set)
-        self.accounts_tree.pack(side='left', fill='both', expand=True)
-        scrollbar.config(command=self.accounts_tree.yview)
-        
-        # Configurar columnas
-        self.accounts_tree.heading('#0', text='Plataforma')
-        self.accounts_tree.heading('Usuario', text='Usuario/Email')
-        self.accounts_tree.heading('Categoría', text='Categoría')
-        
-        self.accounts_tree.column('#0', width=150)
-        self.accounts_tree.column('Usuario', width=150)
-        self.accounts_tree.column('Categoría', width=100)
-        
-        # Bind eventos
-        self.accounts_tree.bind('<<TreeviewSelect>>', self.on_account_select)
-        self.accounts_tree.bind('<Double-Button-1>', lambda e: self.show_password())
-    
-    def create_right_panel(self, parent):
-        """Crea el panel derecho con detalles y acciones"""
-        right_frame = tk.Frame(parent, bg='#252525', width=350)
-        right_frame.pack(side='right', fill='both', padx=(5, 0))
-        right_frame.pack_propagate(False)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(15)
         
         # Título
-        ttk.Label(right_frame,
-                 text="Detalles de la Cuenta",
-                 style='Title.TLabel').pack(padx=20, pady=(20, 10))
+        title = QLabel("📝 " + ("Editar Cuenta" if self.account else "Nueva Cuenta"))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            QLabel {
+                font-size: 24px;
+                font-weight: bold;
+                color: #0d7377;
+                margin-bottom: 20px;
+            }
+        """)
+        layout.addWidget(title)
         
-        # Frame de detalles
-        self.details_frame = tk.Frame(right_frame, bg='#252525')
-        self.details_frame.pack(fill='both', expand=True, padx=20)
+        # Campos del formulario
+        layout.addWidget(QLabel("Nombre de la cuenta:"))
+        self.name_entry = ModernLineEdit("Ej: Gmail Personal")
+        layout.addWidget(self.name_entry)
         
-        # Mensaje cuando no hay cuenta seleccionada
-        self.no_selection_label = ttk.Label(self.details_frame,
-                                           text="Seleccione una cuenta\npara ver los detalles",
-                                           style='Subtitle.TLabel',
-                                           justify='center')
-        self.no_selection_label.pack(expand=True)
+        layout.addWidget(QLabel("Nombre de usuario:"))
+        self.username_entry = ModernLineEdit("Ej: usuario@gmail.com")
+        layout.addWidget(self.username_entry)
         
-        # Frame de detalles (inicialmente oculto)
-        self.account_details_frame = tk.Frame(self.details_frame, bg='#252525')
+        layout.addWidget(QLabel("Contraseña:"))
+        password_layout = QHBoxLayout()
+        self.password_entry = ModernLineEdit("Contraseña segura", True)
+        self.toggle_password_btn = ModernButton("👁", "secondary")
+        self.toggle_password_btn.setMaximumWidth(50)
+        self.toggle_password_btn.clicked.connect(self.toggle_password_visibility)
+        password_layout.addWidget(self.password_entry)
+        password_layout.addWidget(self.toggle_password_btn)
+        layout.addLayout(password_layout)
         
-        # Acciones
-        actions_frame = tk.Frame(right_frame, bg='#252525')
-        actions_frame.pack(fill='x', padx=20, pady=20)
+        layout.addWidget(QLabel("URL (opcional):"))
+        self.url_entry = ModernLineEdit("Ej: https://mail.google.com")
+        layout.addWidget(self.url_entry)
+        
+        layout.addWidget(QLabel("Categoría:"))
+        self.category_combo = ModernComboBox()
+        self.category_combo.addItems([
+            "Personal", "Trabajo", "Redes Sociales", 
+            "Entretenimiento", "Finanzas", "Educación", "Otros"
+        ])
+        layout.addWidget(self.category_combo)
+        
+        layout.addWidget(QLabel("Notas (opcional):"))
+        self.notes_entry = ModernTextEdit("Notas adicionales...")
+        layout.addWidget(self.notes_entry)
+        
+        # Spacer
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        
+        # Botones
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+        
+        cancel_btn = ModernButton("Cancelar", "secondary")
+        cancel_btn.clicked.connect(self.reject)
+        
+        save_btn = ModernButton("Guardar", "success", "💾")
+        save_btn.clicked.connect(self.save_account)
+        
+        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(save_btn)
+        
+        layout.addLayout(button_layout)
+    
+    def toggle_password_visibility(self):
+        """Alterna la visibilidad de la contraseña"""
+        if self.password_entry.echoMode() == QLineEdit.EchoMode.Password:
+            self.password_entry.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.toggle_password_btn.setText("🙈")
+        else:
+            self.password_entry.setEchoMode(QLineEdit.EchoMode.Password)
+            self.toggle_password_btn.setText("👁")
+    
+    def load_account_data(self):
+        """Carga los datos de la cuenta en el formulario"""
+        self.name_entry.setText(self.account.name)
+        self.username_entry.setText(self.account.username)
+        self.password_entry.setText(self.account.password)
+        self.url_entry.setText(self.account.url or "")
+        self.category_combo.setCurrentText(self.account.category)
+        self.notes_entry.setText(self.account.notes or "")
+    
+    def save_account(self):
+        """Valida y guarda la cuenta"""
+        # Validar campos requeridos
+        if not all([self.name_entry.text(), self.username_entry.text(), self.password_entry.text()]):
+            QMessageBox.warning(self, "Error", "Por favor complete todos los campos obligatorios")
+            return
+        
+        # Crear o actualizar cuenta
+        account_data = {
+            "name": self.name_entry.text(),
+            "username": self.username_entry.text(),
+            "password": self.password_entry.text(),
+            "url": self.url_entry.text() or None,
+            "category": self.category_combo.currentText(),
+            "notes": self.notes_entry.toPlainText() or None,
+            "last_modified": datetime.now().isoformat()
+        }
+        
+        if self.account:
+            account_data["id"] = self.account.id
+            account_data["created_at"] = self.account.created_at
+        else:
+            account_data["created_at"] = datetime.now().isoformat()
+        
+        self.account_data = account_data
+        self.accept()
+
+
+class HomeWindow(QMainWindow):
+    def __init__(self, admin_user, fernet_key):
+        super().__init__()
+        self.admin_user = admin_user
+        self.fernet_key = fernet_key
+        self.account_manager = AccountManager(fernet_key)
+        
+        self.setup_ui()
+        self.load_accounts()
+    
+    def setup_ui(self):
+        """Configura la interfaz principal"""
+        self.setWindowTitle("Gestor de Contraseñas - Home")
+        self.setGeometry(100, 100, 1200, 800)
+        
+        # Estilo global
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #1e1e1e;
+            }
+            QWidget {
+                background-color: #1e1e1e;
+                color: white;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+        """)
+        
+        # Widget central
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        
+        # Layout principal
+        main_layout = QVBoxLayout(self.central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # Header
+        self.create_header(main_layout)
+        
+        # Contenido
+        content_widget = QWidget()
+        content_widget.setStyleSheet("background-color: #1e1e1e; padding: 20px;")
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setSpacing(20)
+        
+        # Barra de herramientas
+        self.create_toolbar(content_layout)
+        
+        # Tabla de cuentas
+        self.create_accounts_table(content_layout)
+        
+        # Estadísticas
+        self.create_stats_bar(content_layout)
+        
+        main_layout.addWidget(content_widget)
+    
+    def create_header(self, parent_layout):
+        """Crea el header de la aplicación"""
+        header = QFrame()
+        header.setFixedHeight(80)
+        header.setStyleSheet("""
+            QFrame {
+                background-color: #0d7377;
+                border-bottom: 2px solid #0a5d61;
+            }
+        """)
+        
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(30, 0, 30, 0)
+        
+        # Logo y título
+        logo_section = QHBoxLayout()
+        logo_section.setSpacing(15)
+        
+        logo = QLabel("🔐")
+        logo.setStyleSheet("font-size: 36px;")
+        logo_section.addWidget(logo)
+        
+        title_section = QVBoxLayout()
+        title_section.setSpacing(5)
+        
+        app_title = QLabel("Gestor de Contraseñas")
+        app_title.setStyleSheet("""
+            QLabel {
+                font-size: 24px;
+                font-weight: bold;
+                color: white;
+            }
+        """)
+        title_section.addWidget(app_title)
+        
+        welcome_label = QLabel(f"Bienvenido, {self.admin_user.username}")
+        welcome_label.setStyleSheet("""
+            QLabel {
+                font-size: 14px;
+                color: #cccccc;
+            }
+        """)
+        title_section.addWidget(welcome_label)
+        
+        logo_section.addLayout(title_section)
+        header_layout.addLayout(logo_section)
+        
+        header_layout.addStretch()
+        
+        # Botón de cerrar sesión
+        logout_btn = QPushButton("🚪 Cerrar Sesión")
+        logout_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: white;
+                border: 2px solid white;
+                border-radius: 8px;
+                padding: 10px 20px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+        """)
+        logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        logout_btn.clicked.connect(self.logout)
+        header_layout.addWidget(logout_btn)
+        
+        parent_layout.addWidget(header)
+    
+    def create_toolbar(self, parent_layout):
+        """Crea la barra de herramientas"""
+        toolbar_widget = QWidget()
+        toolbar_layout = QHBoxLayout(toolbar_widget)
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Búsqueda
+        self.search_entry = ModernLineEdit("🔍 Buscar cuentas...")
+        self.search_entry.textChanged.connect(self.filter_accounts)
+        toolbar_layout.addWidget(self.search_entry, 2)
+        
+        # Filtro de categoría
+        self.category_filter = ModernComboBox()
+        self.category_filter.addItem("Todas las categorías")
+        self.category_filter.addItems([
+            "Personal", "Trabajo", "Redes Sociales", 
+            "Entretenimiento", "Finanzas", "Educación", "Otros"
+        ])
+        self.category_filter.currentTextChanged.connect(self.filter_accounts)
+        toolbar_layout.addWidget(self.category_filter, 1)
+        
+        toolbar_layout.addStretch()
         
         # Botones de acción
-        self.edit_btn = tk.Button(actions_frame,
-                                 text="✏️ Editar",
-                                 command=self.edit_account,
-                                 bg='#1976d2',
-                                 fg='white',
-                                 font=('Arial', 10),
-                                 padx=15,
-                                 pady=8,
-                                 cursor='hand2',
-                                 relief='flat',
-                                 state='disabled')
-        self.edit_btn.pack(side='left', padx=(0, 10))
+        add_btn = ModernButton("Nueva Cuenta", "success", "➕")
+        add_btn.clicked.connect(self.add_account)
+        toolbar_layout.addWidget(add_btn)
         
-        self.delete_btn = tk.Button(actions_frame,
-                                   text="🗑️ Eliminar",
-                                   command=self.delete_account,
-                                   bg='#d32f2f',
-                                   fg='white',
-                                   font=('Arial', 10),
-                                   padx=15,
-                                   pady=8,
-                                   cursor='hand2',
-                                   relief='flat',
-                                   state='disabled')
-        self.delete_btn.pack(side='left')
-        
-        # Botón generar contraseña
-        gen_pass_btn = tk.Button(actions_frame,
-                                text="🔐 Generar Contraseña",
-                                command=self.generate_password,
-                                bg='#673ab7',
-                                fg='white',
-                                font=('Arial', 10),
-                                padx=15,
-                                pady=8,
-                                cursor='hand2',
-                                relief='flat')
-        gen_pass_btn.pack(side='right')
+        parent_layout.addWidget(toolbar_widget)
     
-    def create_status_bar(self):
-        """Crea la barra de estado"""
-        status_frame = tk.Frame(self.root, bg='#1a1a1a', height=30)
-        status_frame.pack(fill='x', side='bottom')
-        status_frame.pack_propagate(False)
+    def create_accounts_table(self, parent_layout):
+        """Crea la tabla de cuentas"""
+        # Frame contenedor
+        table_frame = QFrame()
+        table_frame.setStyleSheet("""
+            QFrame {
+                background-color: #2d2d2d;
+                border-radius: 12px;
+                border: 1px solid #404040;
+            }
+        """)
         
-        # Información de cuentas
-        self.status_label = tk.Label(status_frame,
-                                    text="",
-                                    bg='#1a1a1a',
-                                    fg='#888',
-                                    font=('Arial', 9))
-        self.status_label.pack(side='left', padx=10, pady=5)
+        table_layout = QVBoxLayout(table_frame)
+        table_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Hora
-        self.time_label = tk.Label(status_frame,
-                                  text="",
-                                  bg='#1a1a1a',
-                                  fg='#888',
-                                  font=('Arial', 9))
-        self.time_label.pack(side='right', padx=10, pady=5)
+        # Tabla
+        self.accounts_table = QTableWidget()
+        self.accounts_table.setColumnCount(6)
+        self.accounts_table.setHorizontalHeaderLabels([
+            "Nombre", "Usuario", "Contraseña", "URL", "Categoría", "Acciones"
+        ])
         
-        self.update_status_bar()
-        self.update_time()
+        # Estilo de la tabla
+        self.accounts_table.setStyleSheet("""
+            QTableWidget {
+                background-color: #2d2d2d;
+                color: white;
+                border: none;
+                border-radius: 12px;
+                gridline-color: #404040;
+                font-size: 14px;
+            }
+            QTableWidget::item {
+                padding: 10px;
+                border-bottom: 1px solid #404040;
+            }
+            QTableWidget::item:selected {
+                background-color: #0d7377;
+            }
+            QHeaderView::section {
+                background-color: #252525;
+                color: white;
+                padding: 12px;
+                border: none;
+                border-bottom: 2px solid #404040;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QTableCornerButton::section {
+                background-color: #252525;
+                border: none;
+            }
+        """)
+        
+        # Configuración de la tabla
+        self.accounts_table.setAlternatingRowColors(False)
+        self.accounts_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.accounts_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.accounts_table.horizontalHeader().setStretchLastSection(True)
+        self.accounts_table.verticalHeader().setVisible(False)
+        
+        # Configurar ancho de columnas
+        self.accounts_table.setColumnWidth(0, 200)  # Nombre
+        self.accounts_table.setColumnWidth(1, 250)  # Usuario
+        self.accounts_table.setColumnWidth(2, 200)  # Contraseña
+        self.accounts_table.setColumnWidth(3, 200)  # URL
+        self.accounts_table.setColumnWidth(4, 150)  # Categoría
+        
+        # Aplicar delegado personalizado para categorías
+        self.accounts_table.setItemDelegateForColumn(4, CategoryDelegate())
+        
+        table_layout.addWidget(self.accounts_table)
+        
+        parent_layout.addWidget(table_frame)
     
-    def refresh_accounts_list(self):
-        """Actualiza la lista de cuentas"""
-        # Limpiar árbol
-        for item in self.accounts_tree.get_children():
-            self.accounts_tree.delete(item)
+    def create_stats_bar(self, parent_layout):
+        """Crea la barra de estadísticas"""
+        stats_frame = QFrame()
+        stats_frame.setFixedHeight(80)
+        stats_frame.setStyleSheet("""
+            QFrame {
+                background-color: #2d2d2d;
+                border-radius: 12px;
+                border: 1px solid #404040;
+            }
+        """)
         
-        # Actualizar combo de categorías
-        categories = ["Todas"] + self.account_manager.get_all_categories()
-        if hasattr(self, 'category_var'):
-            category_combo = self.root.nametowidget(self.accounts_tree.master.master.winfo_children()[1].winfo_children()[1])
-            category_combo['values'] = categories
+        stats_layout = QHBoxLayout(stats_frame)
+        stats_layout.setContentsMargins(30, 0, 30, 0)
         
-        # Agregar cuentas
-        self.filter_accounts()
+        # Total de cuentas
+        self.total_accounts_label = self.create_stat_widget("📊", "Total de Cuentas", "0")
+        stats_layout.addWidget(self.total_accounts_label)
         
-        # Actualizar barra de estado
-        self.update_status_bar()
+        # Separador
+        separator = QFrame()
+        separator.setFixedWidth(2)
+        separator.setStyleSheet("background-color: #404040;")
+        stats_layout.addWidget(separator)
+        
+        # Última actualización
+        self.last_update_label = self.create_stat_widget("🕐", "Última Actualización", "Nunca")
+        stats_layout.addWidget(self.last_update_label)
+        
+        # Separador
+        separator2 = QFrame()
+        separator2.setFixedWidth(2)
+        separator2.setStyleSheet("background-color: #404040;")
+        stats_layout.addWidget(separator2)
+        
+        # Categoría más usada
+        self.top_category_label = self.create_stat_widget("🏆", "Categoría Principal", "N/A")
+        stats_layout.addWidget(self.top_category_label)
+        
+        parent_layout.addWidget(stats_frame)
+    
+    def create_stat_widget(self, icon, title, value):
+        """Crea un widget de estadística"""
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setSpacing(15)
+        
+        # Icono
+        icon_label = QLabel(icon)
+        icon_label.setStyleSheet("font-size: 28px;")
+        layout.addWidget(icon_label)
+        
+        # Textos
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(5)
+        
+        title_label = QLabel(title)
+        title_label.setStyleSheet("""
+            QLabel {
+                font-size: 12px;
+                color: #999999;
+            }
+        """)
+        text_layout.addWidget(title_label)
+        
+        value_label = QLabel(value)
+        value_label.setStyleSheet("""
+            QLabel {
+                font-size: 20px;
+                font-weight: bold;
+                color: #0d7377;
+            }
+        """)
+        value_label.setObjectName(f"{title.lower().replace(' ', '_')}_value")
+        text_layout.addWidget(value_label)
+        
+        layout.addLayout(text_layout)
+        layout.addStretch()
+        
+        return widget
+    
+    def load_accounts(self):
+        """Carga todas las cuentas en la tabla"""
+        accounts = self.account_manager.get_all_accounts()
+        self.display_accounts(accounts)
+        self.update_stats(accounts)
+    
+    def display_accounts(self, accounts):
+        """Muestra las cuentas en la tabla"""
+        self.accounts_table.setRowCount(0)
+        
+        for account in accounts:
+            row = self.accounts_table.rowCount()
+            self.accounts_table.insertRow(row)
+            
+            # Nombre
+            self.accounts_table.setItem(row, 0, QTableWidgetItem(account.name))
+            
+            # Usuario
+            self.accounts_table.setItem(row, 1, QTableWidgetItem(account.username))
+            
+            # Contraseña (oculta)
+            password_item = QTableWidgetItem("••••••••")
+            password_item.setData(Qt.ItemDataRole.UserRole, account.password)
+            self.accounts_table.setItem(row, 2, password_item)
+            
+            # URL
+            self.accounts_table.setItem(row, 3, QTableWidgetItem(account.url or ""))
+            
+            # Categoría
+            self.accounts_table.setItem(row, 4, QTableWidgetItem(account.category))
+            
+            # Acciones
+            actions_widget = QWidget()
+            actions_layout = QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(5, 5, 5, 5)
+            actions_layout.setSpacing(5)
+            
+            # Botón ver/ocultar contraseña
+            view_btn = QPushButton("👁")
+            view_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #404040;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 8px;
+                    font-size: 16px;
+                }
+                QPushButton:hover {
+                    background-color: #555555;
+                }
+            """)
+            view_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            view_btn.clicked.connect(lambda checked, r=row: self.toggle_password(r))
+            
+            # Botón editar
+            edit_btn = QPushButton("✏️")
+            edit_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #0d7377;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 8px;
+                    font-size: 16px;
+                }
+                QPushButton:hover {
+                    background-color: #0a5d61;
+                }
+            """)
+            edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            edit_btn.clicked.connect(lambda checked, acc=account: self.edit_account(acc))
+            
+            # Botón eliminar
+            delete_btn = QPushButton("🗑️")
+            delete_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #dc3545;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 8px;
+                    font-size: 16px;
+                }
+                QPushButton:hover {
+                    background-color: #c82333;
+                }
+            """)
+            delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            delete_btn.clicked.connect(lambda checked, acc=account: self.delete_account(acc))
+            
+            actions_layout.addWidget(view_btn)
+            actions_layout.addWidget(edit_btn)
+            actions_layout.addWidget(delete_btn)
+            actions_layout.addStretch()
+            
+            self.accounts_table.setCellWidget(row, 5, actions_widget)
+            
+            # Ajustar altura de la fila
+            self.accounts_table.setRowHeight(row, 60)
+    
+    def update_stats(self, accounts):
+        """Actualiza las estadísticas"""
+        # Total de cuentas
+        total_label = self.total_accounts_label.findChild(QLabel, "total_de_cuentas_value")
+        if total_label:
+            total_label.setText(str(len(accounts)))
+        
+        # Última actualización
+        if accounts:
+            last_updates = [datetime.fromisoformat(acc.last_modified) for acc in accounts]
+            last_update = max(last_updates)
+            last_update_str = last_update.strftime("%d/%m/%Y %H:%M")
+        else:
+            last_update_str = "Nunca"
+        
+        last_label = self.total_accounts_label.parent().findChild(QLabel, "última_actualización_value")
+        if last_label:
+            last_label.setText(last_update_str)
+        
+        # Categoría más usada
+        if accounts:
+            categories = [acc.category for acc in accounts]
+            most_common = max(set(categories), key=categories.count)
+            count = categories.count(most_common)
+            category_str = f"{most_common} ({count})"
+        else:
+            category_str = "N/A"
+        
+        category_label = self.total_accounts_label.parent().findChild(QLabel, "categoría_principal_value")
+        if category_label:
+            category_label.setText(category_str)
     
     def filter_accounts(self):
         """Filtra las cuentas según búsqueda y categoría"""
-        # Limpiar árbol
-        for item in self.accounts_tree.get_children():
-            self.accounts_tree.delete(item)
+        search_text = self.search_entry.text().lower()
+        category_filter = self.category_filter.currentText()
         
-        search_term = self.search_var.get().lower()
-        category_filter = self.category_var.get()
+        all_accounts = self.account_manager.get_all_accounts()
+        filtered_accounts = []
         
-        # Obtener cuentas filtradas
-        accounts = self.account_manager.accounts
+        for account in all_accounts:
+            # Filtro de búsqueda
+            if search_text:
+                if not any([
+                    search_text in account.name.lower(),
+                    search_text in account.username.lower(),
+                    search_text in (account.url or "").lower(),
+                    search_text in (account.notes or "").lower()
+                ]):
+                    continue
+            
+            # Filtro de categoría
+            if category_filter != "Todas las categorías":
+                if account.category != category_filter:
+                    continue
+            
+            filtered_accounts.append(account)
         
-        if category_filter != "Todas":
-            accounts = [acc for acc in accounts if acc.category == category_filter]
-        
-        if search_term:
-            accounts = [acc for acc in accounts 
-                       if search_term in acc.platform.lower() or 
-                          search_term in acc.email_or_username.lower()]
-        
-        # Agregar al árbol
-        for account in accounts:
-            self.accounts_tree.insert('', 'end',
-                                     text=account.platform,
-                                     values=(account.email_or_username, account.category))
+        self.display_accounts(filtered_accounts)
     
-    def on_account_select(self, event):
-        """Maneja la selección de una cuenta"""
-        selection = self.accounts_tree.selection()
-        if not selection:
-            return
+    def toggle_password(self, row):
+        """Muestra/oculta la contraseña en una fila"""
+        password_item = self.accounts_table.item(row, 2)
+        current_text = password_item.text()
         
-        # Obtener cuenta seleccionada
-        item = self.accounts_tree.item(selection[0])
-        platform = item['text']
-        
-        self.selected_account = self.account_manager.get_account_by_platform(platform)
-        
-        if self.selected_account:
-            self.show_account_details()
-            self.edit_btn.config(state='normal')
-            self.delete_btn.config(state='normal')
-    
-    def show_account_details(self):
-        """Muestra los detalles de la cuenta seleccionada"""
-        # Ocultar mensaje de no selección
-        self.no_selection_label.pack_forget()
-        
-        # Limpiar frame de detalles
-        for widget in self.account_details_frame.winfo_children():
-            widget.destroy()
-        
-        self.account_details_frame.pack(fill='both', expand=True)
-        
-        # Detalles
-        details = [
-            ("Plataforma:", self.selected_account.platform),
-            ("Usuario/Email:", self.selected_account.email_or_username),
-            ("Categoría:", self.selected_account.category),
-            ("Contraseña:", "*" * 12),
-        ]
-        
-        for label, value in details:
-            row_frame = tk.Frame(self.account_details_frame, bg='#252525')
-            row_frame.pack(fill='x', pady=5)
+        if current_text == "••••••••":
+            # Mostrar contraseña
+            real_password = password_item.data(Qt.ItemDataRole.UserRole)
+            password_item.setText(real_password)
             
-            tk.Label(row_frame,
-                    text=label,
-                    bg='#252525',
-                    fg='#888',
-                    font=('Arial', 10),
-                    width=15,
-                    anchor='w').pack(side='left')
-            
-            if label == "Contraseña:":
-                self.password_label = tk.Label(row_frame,
-                                             text=value,
-                                             bg='#252525',
-                                             fg='white',
-                                             font=('Arial', 10, 'bold'))
-                self.password_label.pack(side='left', padx=(0, 10))
-                
-                show_btn = tk.Button(row_frame,
-                                   text="👁️",
-                                   command=self.toggle_password,
-                                   bg='#252525',
-                                   fg='white',
-                                   font=('Arial', 8),
-                                   cursor='hand2',
-                                   relief='flat')
-                show_btn.pack(side='left')
-            else:
-                tk.Label(row_frame,
-                        text=value,
-                        bg='#252525',
-                        fg='white',
-                        font=('Arial', 10, 'bold')).pack(side='left')
-        
-        # Notas
-        if self.selected_account.notes:
-            notes_frame = tk.Frame(self.account_details_frame, bg='#252525')
-            notes_frame.pack(fill='x', pady=(15, 5))
-            
-            tk.Label(notes_frame,
-                    text="Notas:",
-                    bg='#252525',
-                    fg='#888',
-                    font=('Arial', 10),
-                    anchor='w').pack(anchor='w')
-            
-            notes_text = tk.Text(notes_frame,
-                               bg='#2d2d2d',
-                               fg='white',
-                               font=('Arial', 9),
-                               height=4,
-                               wrap='word',
-                               relief='flat')
-            notes_text.pack(fill='x', pady=5)
-            notes_text.insert('1.0', self.selected_account.notes)
-            notes_text.config(state='disabled')
-        
-        # Fechas
-        if self.selected_account.created_at:
-            dates_frame = tk.Frame(self.account_details_frame, bg='#252525')
-            dates_frame.pack(fill='x', pady=(15, 0))
-            
-            tk.Label(dates_frame,
-                    text=f"Creada: {self.selected_account.created_at[:10]}",
-                    bg='#252525',
-                    fg='#666',
-                    font=('Arial', 8)).pack(anchor='w')
-            
-            if self.selected_account.updated_at:
-                tk.Label(dates_frame,
-                        text=f"Actualizada: {self.selected_account.updated_at[:10]}",
-                        bg='#252525',
-                        fg='#666',
-                        font=('Arial', 8)).pack(anchor='w')
-    
-    def toggle_password(self):
-        """Alterna la visibilidad de la contraseña"""
-        if self.password_label.cget('text').startswith('*'):
-            self.password_label.config(text=self.selected_account.password)
+            # Cambiar icono del botón
+            actions_widget = self.accounts_table.cellWidget(row, 5)
+            view_btn = actions_widget.findChildren(QPushButton)[0]
+            view_btn.setText("🙈")
         else:
-            self.password_label.config(text='*' * 12)
+            # Ocultar contraseña
+            password_item.setText("••••••••")
+            
+            # Cambiar icono del botón
+            actions_widget = self.accounts_table.cellWidget(row, 5)
+            view_btn = actions_widget.findChildren(QPushButton)[0]
+            view_btn.setText("👁")
     
-    def show_password(self):
-        """Muestra la contraseña en un diálogo"""
-        if not self.selected_account:
-            return
-        
-        # Crear ventana de diálogo
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Contraseña")
-        dialog.geometry("400x200")
-        dialog.configure(bg='#1e1e1e')
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # Centrar ventana
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
-        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
-        
-        # Contenido
-        tk.Label(dialog,
-                text=f"Contraseña de {self.selected_account.platform}",
-                bg='#1e1e1e',
-                fg='white',
-                font=('Arial', 12, 'bold')).pack(pady=20)
-        
-        # Frame para contraseña
-        pass_frame = tk.Frame(dialog, bg='#2d2d2d', relief='solid', bd=1)
-        pass_frame.pack(padx=20, pady=10)
-        
-        password_text = tk.Text(pass_frame,
-                               bg='#2d2d2d',
-                               fg='white',
-                               font=('Consolas', 14),
-                               height=1,
-                               width=30,
-                               relief='flat')
-        password_text.pack(padx=10, pady=10)
-        password_text.insert('1.0', self.selected_account.password)
-        password_text.config(state='disabled')
-        
-        # Botón copiar
-        def copy_password():
-            self.root.clipboard_clear()
-            self.root.clipboard_append(self.selected_account.password)
-            messagebox.showinfo("Copiado", "Contraseña copiada al portapapeles", parent=dialog)
-            dialog.destroy()
-        
-        tk.Button(dialog,
-                 text="📋 Copiar",
-                 command=copy_password,
-                 bg='#0d7377',
-                 fg='white',
-                 font=('Arial', 10),
-                 padx=20,
-                 pady=8,
-                 cursor='hand2',
-                 relief='flat').pack(pady=10)
-    
-    def show_add_account_dialog(self):
+    def add_account(self):
         """Muestra el diálogo para agregar una cuenta"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Agregar Nueva Cuenta")
-        dialog.geometry("500x550")
-        dialog.configure(bg='#1e1e1e')
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # Centrar
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
-        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
-        
-        # Frame principal
-        main_frame = tk.Frame(dialog, bg='#1e1e1e')
-        main_frame.pack(fill='both', expand=True, padx=30, pady=20)
-        
-        # Título
-        tk.Label(main_frame,
-                text="Nueva Cuenta",
-                bg='#1e1e1e',
-                fg='white',
-                font=('Arial', 16, 'bold')).pack(pady=(0, 20))
-        
-        # Campos
-        fields = []
-        
-        # Plataforma
-        tk.Label(main_frame, text="Plataforma:", bg='#1e1e1e', fg='white', 
-                font=('Arial', 11)).pack(anchor='w', pady=(10, 5))
-        platform_entry = ttk.Entry(main_frame, font=('Arial', 11), width=40)
-        platform_entry.pack(fill='x')
-        fields.append(platform_entry)
-        
-        # Usuario/Email
-        tk.Label(main_frame, text="Usuario/Email:", bg='#1e1e1e', fg='white',
-                font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
-        user_entry = ttk.Entry(main_frame, font=('Arial', 11), width=40)
-        user_entry.pack(fill='x')
-        fields.append(user_entry)
-        
-        # Contraseña
-        tk.Label(main_frame, text="Contraseña:", bg='#1e1e1e', fg='white',
-                font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
-        
-        pass_frame = tk.Frame(main_frame, bg='#1e1e1e')
-        pass_frame.pack(fill='x')
-        
-        password_entry = ttk.Entry(pass_frame, font=('Arial', 11), width=30)
-        password_entry.pack(side='left', fill='x', expand=True)
-        fields.append(password_entry)
-        
-        # Botón generar
-        def generate_for_field():
-            password = self.account_manager.suggest_strong_password(16)
-            password_entry.delete(0, tk.END)
-            password_entry.insert(0, password)
-        
-        tk.Button(pass_frame,
-                 text="Generar",
-                 command=generate_for_field,
-                 bg='#673ab7',
-                 fg='white',
-                 font=('Arial', 9),
-                 padx=10,
-                 pady=5,
-                 cursor='hand2',
-                 relief='flat').pack(side='right', padx=(10, 0))
-        
-        # Categoría
-        tk.Label(main_frame, text="Categoría:", bg='#1e1e1e', fg='white',
-                font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
-        
-        categories = ["Entretenimiento", "Financiero", "Productividad", "Educativo", "otros"]
-        category_var = tk.StringVar(value=categories[0])
-        
-        category_frame = tk.Frame(main_frame, bg='#1e1e1e')
-        category_frame.pack(fill='x')
-        
-        for cat in categories:
-            tk.Radiobutton(category_frame,
-                          text=cat.capitalize(),
-                          variable=category_var,
-                          value=cat,
-                          bg='#1e1e1e',
-                          fg='white',
-                          selectcolor='#0d7377',
-                          font=('Arial', 10)).pack(side='left', padx=(0, 15))
-        
-        # Notas
-        tk.Label(main_frame, text="Notas (opcional):", bg='#1e1e1e', fg='white',
-                font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
-        notes_text = tk.Text(main_frame, 
-                           bg='#2d2d2d',
-                           fg='white',
-                           font=('Arial', 10),
-                           height=4,
-                           relief='flat')
-        notes_text.pack(fill='x')
-        
-        # Botones
-        buttons_frame = tk.Frame(main_frame, bg='#1e1e1e')
-        buttons_frame.pack(fill='x', pady=(30, 0))
-        
-        def save_account():
-            platform = platform_entry.get().strip()
-            user = user_entry.get().strip()
-            password = password_entry.get().strip()
-            category = category_var.get()
-            notes = notes_text.get('1.0', 'end-1c').strip()
-            
-            if not all([platform, user, password]):
-                messagebox.showerror("Error", "Complete todos los campos obligatorios", parent=dialog)
-                return
-            
+        dialog = AccountDialog(self)
+        if dialog.exec():
             try:
-                self.account_manager.create_account(
-                    platform=platform,
-                    email_or_username=user,
-                    password=password,
-                    category=category,
-                    notes=notes
-                )
-                messagebox.showinfo("Éxito", f"Cuenta '{platform}' agregada correctamente", parent=dialog)
-                self.refresh_accounts_list()
-                dialog.destroy()
-            except Exception as e:
-                messagebox.showerror("Error", f"Error al guardar: {str(e)}", parent=dialog)
-        
-        tk.Button(buttons_frame,
-                 text="Guardar",
-                 command=save_account,
-                 bg='#14ae5c',
-                 fg='white',
-                 font=('Arial', 11, 'bold'),
-                 padx=30,
-                 pady=8,
-                 cursor='hand2',
-                 relief='flat').pack(side='left', padx=(0, 10))
-        
-        tk.Button(buttons_frame,
-                 text="Cancelar",
-                 command=dialog.destroy,
-                 bg='#555',
-                 fg='white',
-                 font=('Arial', 11),
-                 padx=30,
-                 pady=8,
-                 cursor='hand2',
-                 relief='flat').pack(side='left')
-    
-    def edit_account(self):
-        """Edita la cuenta seleccionada"""
-        if not self.selected_account:
-            return
-        
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Editar Cuenta")
-        dialog.geometry("500x550")
-        dialog.configure(bg='#1e1e1e')
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # Centrar
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
-        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
-        
-        # Frame principal
-        main_frame = tk.Frame(dialog, bg='#1e1e1e')
-        main_frame.pack(fill='both', expand=True, padx=30, pady=20)
-        
-        # Título
-        tk.Label(main_frame,
-                text=f"Editar: {self.selected_account.platform}",
-                bg='#1e1e1e',
-                fg='white',
-                font=('Arial', 16, 'bold')).pack(pady=(0, 20))
-        
-        # Usuario/Email
-        tk.Label(main_frame, text="Usuario/Email:", bg='#1e1e1e', fg='white',
-                font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
-        user_entry = ttk.Entry(main_frame, font=('Arial', 11), width=40)
-        user_entry.pack(fill='x')
-        user_entry.insert(0, self.selected_account.email_or_username)
-        
-        # Contraseña
-        tk.Label(main_frame, text="Contraseña:", bg='#1e1e1e', fg='white',
-                font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
-        
-        pass_frame = tk.Frame(main_frame, bg='#1e1e1e')
-        pass_frame.pack(fill='x')
-        
-        password_entry = ttk.Entry(pass_frame, font=('Arial', 11), width=30)
-        password_entry.pack(side='left', fill='x', expand=True)
-        password_entry.insert(0, self.selected_account.password)
-        
-        # Botón generar
-        def generate_for_field():
-            password = self.account_manager.suggest_strong_password(16)
-            password_entry.delete(0, tk.END)
-            password_entry.insert(0, password)
-        
-        tk.Button(pass_frame,
-                 text="Generar",
-                 command=generate_for_field,
-                 bg='#673ab7',
-                 fg='white',
-                 font=('Arial', 9),
-                 padx=10,
-                 pady=5,
-                 cursor='hand2',
-                 relief='flat').pack(side='right', padx=(10, 0))
-        
-        # Categoría
-        tk.Label(main_frame, text="Categoría:", bg='#1e1e1e', fg='white',
-                font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
-        
-        categories = ["Entretenimiento", "Financiero", "Productividad", "Educativo", "otros"]
-        category_var = tk.StringVar(value=self.selected_account.category)
-        
-        category_combo = ttk.Combobox(main_frame,
-                                     textvariable=category_var,
-                                     values=categories,
-                                     state='readonly',
-                                     font=('Arial', 11))
-        category_combo.pack(fill='x')
-        
-        # Notas
-        tk.Label(main_frame, text="Notas:", bg='#1e1e1e', fg='white',
-                font=('Arial', 11)).pack(anchor='w', pady=(15, 5))
-        notes_text = tk.Text(main_frame,
-                           bg='#2d2d2d',
-                           fg='white',
-                           font=('Arial', 10),
-                           height=4,
-                           relief='flat')
-        notes_text.pack(fill='x')
-        if self.selected_account.notes:
-            notes_text.insert('1.0', self.selected_account.notes)
-        
-        # Botones
-        buttons_frame = tk.Frame(main_frame, bg='#1e1e1e')
-        buttons_frame.pack(fill='x', pady=(30, 0))
-        
-        def update_account():
-            user = user_entry.get().strip()
-            password = password_entry.get().strip()
-            category = category_var.get()
-            notes = notes_text.get('1.0', 'end-1c').strip()
-            
-            if not all([user, password]):
-                messagebox.showerror("Error", "Usuario y contraseña son obligatorios", parent=dialog)
-                return
-            
-            try:
-                self.account_manager.update_account(
-                    self.selected_account.platform,
-                    email_or_username=user,
-                    password=password,
-                    category=category,
-                    notes=notes
-                )
-                messagebox.showinfo("Éxito", "Cuenta actualizada correctamente", parent=dialog)
-                self.refresh_accounts_list()
-                self.show_account_details()
-                dialog.destroy()
-            except Exception as e:
-                messagebox.showerror("Error", f"Error al actualizar: {str(e)}", parent=dialog)
-        
-        tk.Button(buttons_frame,
-                 text="Actualizar",
-                 command=update_account,
-                 bg='#1976d2',
-                 fg='white',
-                 font=('Arial', 11, 'bold'),
-                 padx=30,
-                 pady=8,
-                 cursor='hand2',
-                 relief='flat').pack(side='left', padx=(0, 10))
-        
-        tk.Button(buttons_frame,
-                 text="Cancelar",
-                 command=dialog.destroy,
-                 bg='#555',
-                 fg='white',
-                 font=('Arial', 11),
-                 padx=30,
-                 pady=8,
-                 cursor='hand2',
-                 relief='flat').pack(side='left')
-    
-    def delete_account(self):
-        """Elimina la cuenta seleccionada"""
-        if not self.selected_account:
-            return
-        
-        result = messagebox.askyesno(
-            "Confirmar eliminación",
-            f"¿Está seguro de eliminar la cuenta '{self.selected_account.platform}'?\n\nEsta acción no se puede deshacer."
-        )
-        
-        if result:
-            try:
-                self.account_manager.delete_account(self.selected_account.platform)
-                messagebox.showinfo("Éxito", "Cuenta eliminada correctamente")
-                self.selected_account = None
-                self.refresh_accounts_list()
+                # Crear nueva cuenta
+                new_account = Account(**dialog.account_data)
+                self.account_manager.add_account(new_account)
                 
-                # Limpiar panel derecho
-                self.account_details_frame.pack_forget()
-                self.no_selection_label.pack(expand=True)
-                self.edit_btn.config(state='disabled')
-                self.delete_btn.config(state='disabled')
+                # Recargar tabla
+                self.load_accounts()
+                
+                # Mostrar mensaje de éxito
+                self.show_message("Éxito", "Cuenta agregada correctamente", "info")
             except Exception as e:
-                messagebox.showerror("Error", f"Error al eliminar: {str(e)}")
+                self.show_message("Error", f"Error al agregar cuenta: {str(e)}", "critical")
     
-    def generate_password(self):
-        """Muestra diálogo para generar contraseña"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Generador de Contraseñas")
-        dialog.geometry("450x350")
-        dialog.configure(bg='#1e1e1e')
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # Centrar
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
-        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
-        dialog.geometry(f"+{x}+{y}")
-        
-        # Frame principal
-        main_frame = tk.Frame(dialog, bg='#1e1e1e')
-        main_frame.pack(fill='both', expand=True, padx=30, pady=20)
-        
-        # Título
-        tk.Label(main_frame,
-                text="Generador de Contraseñas",
-                bg='#1e1e1e',
-                fg='white',
-                font=('Arial', 16, 'bold')).pack(pady=(0, 20))
-        
-        # Longitud
-        length_frame = tk.Frame(main_frame, bg='#1e1e1e')
-        length_frame.pack(fill='x', pady=10)
-        
-        tk.Label(length_frame,
-                text="Longitud:",
-                bg='#1e1e1e',
-                fg='white',
-                font=('Arial', 11)).pack(side='left', padx=(0, 10))
-        
-        length_var = tk.IntVar(value=16)
-        length_spinbox = ttk.Spinbox(length_frame,
-                                    from_=8,
-                                    to=32,
-                                    textvariable=length_var,
-                                    width=10,
-                                    font=('Arial', 11))
-        length_spinbox.pack(side='left')
-        
-        # Resultado
-        result_frame = tk.Frame(main_frame, bg='#2d2d2d', relief='solid', bd=1)
-        result_frame.pack(fill='x', pady=20)
-        
-        result_text = tk.Text(result_frame,
-                            bg='#2d2d2d',
-                            fg='white',
-                            font=('Consolas', 12),
-                            height=3,
-                            wrap='word',
-                            relief='flat')
-        result_text.pack(padx=10, pady=10)
-        
-        # Botones
-        buttons_frame = tk.Frame(main_frame, bg='#1e1e1e')
-        buttons_frame.pack(fill='x')
-        
-        def generate():
-            password = self.account_manager.suggest_strong_password(length_var.get())
-            result_text.delete('1.0', tk.END)
-            result_text.insert('1.0', password)
-        
-        def copy():
-            password = result_text.get('1.0', 'end-1c')
-            if password:
-                self.root.clipboard_clear()
-                self.root.clipboard_append(password)
-                messagebox.showinfo("Copiado", "Contraseña copiada al portapapeles", parent=dialog)
-        
-        tk.Button(buttons_frame,
-                 text="Generar",
-                 command=generate,
-                 bg='#673ab7',
-                 fg='white',
-                 font=('Arial', 11, 'bold'),
-                 padx=20,
-                 pady=8,
-                 cursor='hand2',
-                 relief='flat').pack(side='left', padx=(0, 10))
-        
-        tk.Button(buttons_frame,
-                 text="Copiar",
-                 command=copy,
-                 bg='#0d7377',
-                 fg='white',
-                 font=('Arial', 11),
-                 padx=20,
-                 pady=8,
-                 cursor='hand2',
-                 relief='flat').pack(side='left')
-        
-        # Generar inicial
-        generate()
+    def edit_account(self, account):
+        """Muestra el diálogo para editar una cuenta"""
+        dialog = AccountDialog(self, account)
+        if dialog.exec():
+            try:
+                # Actualizar cuenta
+                updated_account = Account(**dialog.account_data)
+                self.account_manager.update_account(updated_account.id, updated_account)
+                
+                # Recargar tabla
+                self.load_accounts()
+                
+                # Mostrar mensaje de éxito
+                self.show_message("Éxito", "Cuenta actualizada correctamente", "info")
+            except Exception as e:
+                self.show_message("Error", f"Error al actualizar cuenta: {str(e)}", "critical")
     
-    def update_status_bar(self):
-        """Actualiza la barra de estado"""
-        summary = self.account_manager.get_accounts_summary()
-        total = summary['total']
+    def delete_account(self, account):
+        """Elimina una cuenta con confirmación"""
+        # Diálogo de confirmación
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Confirmar Eliminación")
+        msg.setText(f"¿Está seguro de que desea eliminar la cuenta '{account.name}'?")
+        msg.setInformativeText("Esta acción no se puede deshacer.")
+        msg.setIcon(QMessageBox.Icon.Question)
+        msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        status_text = f"Total de cuentas: {total}"
-        if summary['by_category']:
-            categories_text = " | ".join([f"{cat}: {count}" 
-                                        for cat, count in summary['by_category'].items()])
-            status_text += f" | {categories_text}"
+        # Estilo del mensaje
+        msg.setStyleSheet("""
+            QMessageBox {
+                background-color: #2d2d2d;
+                color: white;
+            }
+            QMessageBox QPushButton {
+                background-color: #0d7377;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #0a5d61;
+            }
+        """)
         
-        self.status_label.config(text=status_text)
-    
-    def update_time(self):
-        """Actualiza la hora en la barra de estado"""
-        current_time = datetime.now().strftime("%H:%M:%S")
-        self.time_label.config(text=current_time)
-        self.root.after(1000, self.update_time)
-    
-    def check_session(self):
-        """Verifica si la sesión sigue siendo válida"""
-        if not self.session_manager.is_session_valid():
-            messagebox.showwarning("Sesión expirada", 
-                                 "Su sesión ha expirado. Por favor, inicie sesión nuevamente.")
-            self.logout()
-        else:
-            # Verificar cada minuto
-            self.root.after(60000, self.check_session)
+        if msg.exec() == QMessageBox.StandardButton.Yes:
+            try:
+                self.account_manager.delete_account(account.id)
+                self.load_accounts()
+                self.show_message("Éxito", "Cuenta eliminada correctamente", "info")
+            except Exception as e:
+                self.show_message("Error", f"Error al eliminar cuenta: {str(e)}", "critical")
     
     def logout(self):
-        """Cierra la sesión y vuelve al login"""
-        self.session_manager.end_session()
-        self.root.destroy()
+        """Cierra sesión y vuelve al login"""
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Cerrar Sesión")
+        msg.setText("¿Está seguro de que desea cerrar sesión?")
+        msg.setIcon(QMessageBox.Icon.Question)
+        msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        # Volver a mostrar login
-        from Vista.login import start_login
-        start_login(lambda u, k: HomeWindow(u, k).run())
+        msg.setStyleSheet("""
+            QMessageBox {
+                background-color: #2d2d2d;
+                color: white;
+            }
+            QMessageBox QPushButton {
+                background-color: #0d7377;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #0a5d61;
+            }
+        """)
+        
+        if msg.exec() == QMessageBox.StandardButton.Yes:
+            self.close()
+            # Aquí podrías reiniciar la aplicación o mostrar el login nuevamente
+            QApplication.quit()
     
-    def run(self):
-        """Ejecuta la ventana principal"""
-        self.root.mainloop()
+    def show_message(self, title, message, icon_type="info"):
+        """Muestra un mensaje con estilo moderno"""
+        msg = QMessageBox(self)
+        msg.setWindowTitle(title)
+        msg.setText(message)
+        
+        # Configurar icono
+        if icon_type == "info":
+            msg.setIcon(QMessageBox.Icon.Information)
+        elif icon_type == "warning":
+            msg.setIcon(QMessageBox.Icon.Warning)
+        elif icon_type == "critical":
+            msg.setIcon(QMessageBox.Icon.Critical)
+        
+        # Estilo moderno para el message box
+        msg.setStyleSheet("""
+            QMessageBox {
+                background-color: #2d2d2d;
+                color: white;
+            }
+            QMessageBox QPushButton {
+                background-color: #0d7377;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #0a5d61;
+            }
+        """)
+        
+        msg.exec()
+    
+    def closeEvent(self, event):
+        """Evento al cerrar la ventana"""
+        # Guardar cualquier cambio pendiente
+        event.accept()
 
 
-# Función helper para iniciar la aplicación principal
-def start_home(admin_user: AdminUser, fernet_key: bytes):
-    """Inicia la ventana principal"""
+def start_home(admin_user, fernet_key):
+    """
+    Inicia la ventana principal del gestor
+    admin_user: usuario autenticado
+    fernet_key: clave Fernet para encriptación
+    """
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    
+    # Configurar estilo global
+    app.setStyleSheet("""
+        QApplication {
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        QToolTip {
+            background-color: #2d2d2d;
+            color: white;
+            border: 1px solid #404040;
+            padding: 5px;
+            border-radius: 4px;
+        }
+    """)
+    
     home = HomeWindow(admin_user, fernet_key)
-    home.run()
+    home.show()
+    
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    # Para pruebas - simular usuario y clave
+    from Modelo.models import AdminUser
+    from cryptography.fernet import Fernet
+    
+    test_user = AdminUser(
+        username="admin",
+        password="hashed_password",
+        password_2fa="hashed_2fa",
+        fernet_key_salt="salt"
+    )
+    
+    test_key = Fernet.generate_key()
+    
+    start_home(test_user, test_key)

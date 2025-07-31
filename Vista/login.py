@@ -1,26 +1,115 @@
-# Vista/login.py
-import tkinter as tk
-from tkinter import ttk, messagebox
+# views/login.py - Versión PySide6
 import sys
 import os
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                               QHBoxLayout, QLabel, QLineEdit, QPushButton, 
+                               QFrame, QStackedWidget, QMessageBox, QSpacerItem,
+                               QSizePolicy, QGraphicsDropShadowEffect)
+from PySide6.QtCore import Qt, QTimer, QEasingCurve, QPropertyAnimation, QRect
+from PySide6.QtGui import QFont, QPixmap, QPalette, QColor, QIcon
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.autenticacion import autenticar_admin, verificar_2fa, obtener_codigo_2fa, generar_Admin
+from core.autenticacion import autenticar_admin, verificar_2fa, obtener_codigo_2fa
 from core.almacenamiento import load_json_data
+from core.seguridad import hash_password_bcrypt, generate_salt
+from Modelo.models import AdminUser
+from core.almacenamiento import save_jsonD
+from base64 import urlsafe_b64encode
 
-class LoginWindow:
-    def __init__(self, on_success_callback):
-        self.root = tk.Tk()
-        self.root.title("Gestor de Contraseñas - Login")
-        self.root.geometry("400x500")
-        self.root.resizable(False, False)
+
+class ModernLineEdit(QLineEdit):
+    """LineEdit personalizado con estilo moderno"""
+    def __init__(self, placeholder="", is_password=False):
+        super().__init__()
+        self.setPlaceholderText(placeholder)
+        if is_password:
+            self.setEchoMode(QLineEdit.EchoMode.Password)
         
-        # Callback cuando el login es exitoso
+        self.setStyleSheet("""
+            QLineEdit {
+                background-color: #2d2d2d;
+                color: white;
+                border: 2px solid #404040;
+                border-radius: 8px;
+                padding: 12px 15px;
+                font-size: 14px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QLineEdit:focus {
+                border-color: #0d7377;
+                background-color: #333333;
+            }
+            QLineEdit:hover {
+                border-color: #555555;
+            }
+        """)
+        self.setMinimumHeight(45)
+
+
+class ModernButton(QPushButton):
+    """Botón personalizado con estilo moderno"""
+    def __init__(self, text, style_type="primary"):
+        super().__init__(text)
+        
+        if style_type == "primary":
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: #0d7377;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 12px 24px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                }
+                QPushButton:hover {
+                    background-color: #0a5d61;
+                }
+                QPushButton:pressed {
+                    background-color: #084a4d;
+                }
+            """)
+        elif style_type == "success":
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: #14ae5c;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 12px 24px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    font-family: 'Segoe UI', Arial, sans-serif;
+                }
+                QPushButton:hover {
+                    background-color: #119950;
+                }
+                QPushButton:pressed {
+                    background-color: #0e7d42;
+                }
+            """)
+        
+        self.setMinimumHeight(45)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        # Agregar sombra
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(10)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
+
+
+class LoginWindow(QMainWindow):
+    def __init__(self, on_success_callback):
+        super().__init__()
         self.on_success = on_success_callback
         self.current_user = None
         self.fernet_key = None
         
-        # Configurar estilo
+        self.setup_ui()
         self.setup_styles()
         
         # Verificar si existe usuario admin
@@ -29,96 +118,131 @@ class LoginWindow:
         else:
             self.show_login_screen()
     
+    def setup_ui(self):
+        """Configura la interfaz básica"""
+        self.setWindowTitle("Gestor de Contraseñas - Login")
+        self.setFixedSize(450, 600)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowCloseButtonHint)
+        
+        # Widget central con stack para múltiples pantallas
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        
+        self.main_layout = QVBoxLayout(self.central_widget)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.stacked_widget = QStackedWidget()
+        self.main_layout.addWidget(self.stacked_widget)
+    
     def setup_styles(self):
-        """Configura los estilos de la aplicación"""
-        self.root.configure(bg='#1e1e1e')
-        
-        style = ttk.Style()
-        style.theme_use('clam')
-        
-        # Configurar colores
-        style.configure('Title.TLabel', 
-                       background='#1e1e1e', 
-                       foreground='white',
-                       font=('Arial', 16, 'bold'))
-        style.configure('Regular.TLabel',
-                       background='#1e1e1e',
-                       foreground='white',
-                       font=('Arial', 10))
+        """Configura los estilos globales"""
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #1e1e1e;
+            }
+            QWidget {
+                background-color: #1e1e1e;
+                color: white;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QLabel {
+                color: white;
+            }
+        """)
     
     def check_admin_exists(self):
         """Verifica si existe un usuario administrador"""
         return load_json_data("DBusers.json") is not None
     
-    def clear_window(self):
-        """Limpia todos los widgets de la ventana"""
-        for widget in self.root.winfo_children():
-            widget.destroy()
+    def create_card_frame(self):
+        """Crea un frame con estilo de tarjeta"""
+        frame = QFrame()
+        frame.setStyleSheet("""
+            QFrame {
+                background-color: #2d2d2d;
+                border-radius: 12px;
+                border: 1px solid #404040;
+            }
+        """)
+        
+        # Agregar sombra
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 100))
+        shadow.setOffset(0, 5)
+        frame.setGraphicsEffect(shadow)
+        
+        return frame
     
     def show_create_admin_screen(self):
         """Muestra la pantalla de creación de admin"""
-        self.clear_window()
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(20)
         
-        # Frame principal
-        main_frame = tk.Frame(self.root, bg='#1e1e1e')
-        main_frame.pack(expand=True, fill='both', padx=40, pady=40)
+        # Spacer superior
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # Título
-        title = ttk.Label(main_frame, text="Crear Usuario Administrador", 
-                         style='Title.TLabel')
-        title.pack(pady=(0, 30))
+        title = QLabel("🛡️ Crear Usuario Administrador")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            QLabel {
+                font-size: 24px;
+                font-weight: bold;
+                color: #0d7377;
+                margin-bottom: 10px;
+            }
+        """)
+        layout.addWidget(title)
         
-        # Username
-        ttk.Label(main_frame, text="Nombre de usuario:", 
-                 style='Regular.TLabel').pack(anchor='w', pady=(10, 5))
-        self.username_entry = ttk.Entry(main_frame, width=30, font=('Arial', 11))
-        self.username_entry.pack(fill='x')
+        # Subtítulo
+        subtitle = QLabel("Configure su usuario administrador para comenzar")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet("color: #cccccc; font-size: 14px; margin-bottom: 20px;")
+        layout.addWidget(subtitle)
         
-        # Contraseña maestra
-        ttk.Label(main_frame, text="Contraseña maestra:", 
-                 style='Regular.TLabel').pack(anchor='w', pady=(15, 5))
-        self.password_entry = ttk.Entry(main_frame, width=30, show="*", font=('Arial', 11))
-        self.password_entry.pack(fill='x')
+        # Tarjeta de formulario
+        card = self.create_card_frame()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(30, 30, 30, 30)
+        card_layout.setSpacing(20)
         
-        # Contraseña 2FA
-        ttk.Label(main_frame, text="Contraseña para 2FA:", 
-                 style='Regular.TLabel').pack(anchor='w', pady=(15, 5))
-        self.password_2fa_entry = ttk.Entry(main_frame, width=30, show="*", font=('Arial', 11))
-        self.password_2fa_entry.pack(fill='x')
+        # Campos del formulario
+        self.username_entry = ModernLineEdit("Ingrese su nombre de usuario")
+        self.password_entry = ModernLineEdit("Contraseña maestra", True)
+        self.password_2fa_entry = ModernLineEdit("Contraseña para 2FA", True)
+        
+        card_layout.addWidget(QLabel("Nombre de usuario:"))
+        card_layout.addWidget(self.username_entry)
+        card_layout.addWidget(QLabel("Contraseña maestra:"))
+        card_layout.addWidget(self.password_entry)
+        card_layout.addWidget(QLabel("Contraseña para 2FA:"))
+        card_layout.addWidget(self.password_2fa_entry)
         
         # Botón crear
-        create_btn = tk.Button(main_frame, 
-                              text="Crear Usuario",
-                              command=self.create_admin,
-                              bg='#0d7377',
-                              fg='white',
-                              font=('Arial', 12, 'bold'),
-                              padx=20,
-                              pady=10,
-                              cursor='hand2',
-                              relief='flat')
-        create_btn.pack(pady=30)
+        create_btn = ModernButton("Crear Usuario Administrador")
+        create_btn.clicked.connect(self.create_admin)
+        card_layout.addWidget(create_btn)
+        
+        layout.addWidget(card)
+        
+        # Spacer inferior
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        
+        self.stacked_widget.addWidget(widget)
+        self.stacked_widget.setCurrentWidget(widget)
     
     def create_admin(self):
         """Crea el usuario administrador"""
-        username = self.username_entry.get()
-        password = self.password_entry.get()
-        password_2fa = self.password_2fa_entry.get()
+        username = self.username_entry.text()
+        password = self.password_entry.text()
+        password_2fa = self.password_2fa_entry.text()
         
         if not all([username, password, password_2fa]):
-            messagebox.showerror("Error", "Todos los campos son obligatorios")
+            self.show_message("Error", "Todos los campos son obligatorios", "warning")
             return
-        
-        # Simular la entrada para generar_Admin
-        import io
-        import contextlib
-        from unittest.mock import patch
-        
-        # Guardar directamente sin usar input/getpass
-        from core.seguridad import hash_password_bcrypt, generate_salt
-        from Modelo.models import AdminUser
-        from core.almacenamiento import save_jsonD
-        from base64 import urlsafe_b64encode
         
         try:
             # Hash de contraseñas
@@ -140,215 +264,334 @@ class LoginWindow:
             # Guardar
             save_jsonD("DBusers.json", nuevo_admin.model_dump())
             
-            messagebox.showinfo("Éxito", "Usuario administrador creado correctamente")
+            self.show_message("Éxito", "Usuario administrador creado correctamente", "info")
             self.show_login_screen()
             
         except Exception as e:
-            messagebox.showerror("Error", f"Error al crear usuario: {str(e)}")
+            self.show_message("Error", f"Error al crear usuario: {str(e)}", "critical")
     
     def show_login_screen(self):
         """Muestra la pantalla de login"""
-        self.clear_window()
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(30)
         
-        # Frame principal
-        main_frame = tk.Frame(self.root, bg='#1e1e1e')
-        main_frame.pack(expand=True, fill='both', padx=40, pady=40)
+        # Spacer superior
+        layout.addSpacerItem(QSpacerItem(20, 60, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
-        # Logo/Título
-        title_frame = tk.Frame(main_frame, bg='#1e1e1e')
-        title_frame.pack(pady=(0, 30))
+        # Logo y título
+        logo_layout = QVBoxLayout()
+        logo_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_layout.setSpacing(15)
         
-        tk.Label(title_frame, text="🔐", font=('Arial', 48), bg='#1e1e1e').pack()
-        ttk.Label(title_frame, text="Gestor de Contraseñas", 
-                 style='Title.TLabel').pack()
+        # Emoji como logo
+        logo = QLabel("🔐")
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo.setStyleSheet("font-size: 64px;")
+        logo_layout.addWidget(logo)
         
-        # Frame de login
-        login_frame = tk.Frame(main_frame, bg='#2d2d2d', relief='flat')
-        login_frame.pack(fill='both', padx=20, pady=20)
+        # Título
+        title = QLabel("Gestor de Contraseñas")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            QLabel {
+                font-size: 28px;
+                font-weight: bold;
+                color: white;
+            }
+        """)
+        logo_layout.addWidget(title)
         
-        inner_frame = tk.Frame(login_frame, bg='#2d2d2d')
-        inner_frame.pack(padx=30, pady=30)
+        # Subtítulo
+        subtitle = QLabel("Acceso seguro a sus credenciales")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet("color: #cccccc; font-size: 14px;")
+        logo_layout.addWidget(subtitle)
         
-        # Username
-        ttk.Label(inner_frame, text="Usuario:", 
-                 font=('Arial', 11), background='#2d2d2d',
-                 foreground='white').grid(row=0, column=0, sticky='w', pady=10)
-        self.username_entry = ttk.Entry(inner_frame, width=25, font=('Arial', 11))
-        self.username_entry.grid(row=0, column=1, padx=(10, 0))
+        layout.addLayout(logo_layout)
         
-        # Password
-        ttk.Label(inner_frame, text="Contraseña:", 
-                 font=('Arial', 11), background='#2d2d2d',
-                 foreground='white').grid(row=1, column=0, sticky='w', pady=10)
-        self.password_entry = ttk.Entry(inner_frame, width=25, show="*", font=('Arial', 11))
-        self.password_entry.grid(row=1, column=1, padx=(10, 0))
+        # Tarjeta de login
+        card = self.create_card_frame()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(30, 30, 30, 30)
+        card_layout.setSpacing(20)
+        
+        # Campos de login
+        self.username_entry = ModernLineEdit("Usuario")
+        self.password_entry = ModernLineEdit("Contraseña", True)
+        
+        card_layout.addWidget(self.username_entry)
+        card_layout.addWidget(self.password_entry)
         
         # Botón de login
-        login_btn = tk.Button(main_frame,
-                            text="Iniciar Sesión",
-                            command=self.attempt_login,
-                            bg='#0d7377',
-                            fg='white',
-                            font=('Arial', 12, 'bold'),
-                            padx=30,
-                            pady=10,
-                            cursor='hand2',
-                            relief='flat')
-        login_btn.pack(pady=20)
+        login_btn = ModernButton("Iniciar Sesión")
+        login_btn.clicked.connect(self.attempt_login)
+        card_layout.addWidget(login_btn)
         
-        # Bind Enter key
-        self.root.bind('<Return>', lambda e: self.attempt_login())
+        layout.addWidget(card)
+        
+        # Spacer inferior
+        layout.addSpacerItem(QSpacerItem(20, 60, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        
+        # Configurar Enter key
+        self.username_entry.returnPressed.connect(self.attempt_login)
+        self.password_entry.returnPressed.connect(self.attempt_login)
+        
+        self.stacked_widget.addWidget(widget)
+        self.stacked_widget.setCurrentWidget(widget)
     
     def attempt_login(self):
         """Intenta hacer login con las credenciales"""
-        username = self.username_entry.get()
-        password = self.password_entry.get()
+        username = self.username_entry.text()
+        password = self.password_entry.text()
         
         if not username or not password:
-            messagebox.showerror("Error", "Por favor complete todos los campos")
+            self.show_message("Error", "Por favor complete todos los campos", "warning")
             return
         
-        # Simular entrada para autenticar_admin
-        from unittest.mock import patch
-        
-        with patch('builtins.input', side_effect=[username]):
-            with patch('getpass.getpass', return_value=password):
-                admin_user, fernet_key = autenticar_admin()
-        
-        if admin_user and fernet_key:
-            self.current_user = admin_user
-            self.fernet_key = fernet_key
-            self.show_2fa_screen()
-        else:
-            messagebox.showerror("Error", "Usuario o contraseña incorrectos")
+        try:
+            # Simular entrada para autenticar_admin
+            from unittest.mock import patch
+            
+            with patch('builtins.input', side_effect=[username]):
+                with patch('getpass.getpass', return_value=password):
+                    admin_user, fernet_key = autenticar_admin()
+            
+            if admin_user and fernet_key:
+                self.current_user = admin_user
+                self.fernet_key = fernet_key
+                self.show_2fa_screen()
+            else:
+                self.show_message("Error", "Usuario o contraseña incorrectos", "warning")
+                self.password_entry.clear()
+                
+        except Exception as e:
+            self.show_message("Error", f"Error en la autenticación: {str(e)}", "critical")
     
     def show_2fa_screen(self):
         """Muestra la pantalla de 2FA"""
-        self.clear_window()
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(25)
         
-        # Frame principal
-        main_frame = tk.Frame(self.root, bg='#1e1e1e')
-        main_frame.pack(expand=True, fill='both', padx=40, pady=40)
+        # Spacer superior
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # Título
-        title = ttk.Label(main_frame, text="Verificación de Dos Factores", 
-                         style='Title.TLabel')
-        title.pack(pady=(0, 30))
+        title = QLabel("🔒 Verificación de Dos Factores")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("""
+            QLabel {
+                font-size: 22px;
+                font-weight: bold;
+                color: #0d7377;
+                margin-bottom: 10px;
+            }
+        """)
+        layout.addWidget(title)
         
         # Instrucciones
-        info_label = ttk.Label(main_frame, 
-                              text="Ingrese su contraseña de 2FA para generar el código",
-                              style='Regular.TLabel')
-        info_label.pack(pady=(0, 20))
+        info_label = QLabel("Ingrese su contraseña de 2FA para generar el código de verificación")
+        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #cccccc; font-size: 14px; margin-bottom: 20px;")
+        layout.addWidget(info_label)
         
-        # Contraseña 2FA
-        self.password_2fa_entry = ttk.Entry(main_frame, width=30, show="*", font=('Arial', 11))
-        self.password_2fa_entry.pack(pady=10)
+        # Tarjeta de 2FA
+        card = self.create_card_frame()
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(30, 30, 30, 30)
+        card_layout.setSpacing(20)
+        
+        # Campo contraseña 2FA
+        self.password_2fa_entry = ModernLineEdit("Contraseña 2FA", True)
+        card_layout.addWidget(self.password_2fa_entry)
         
         # Botón verificar
-        verify_btn = tk.Button(main_frame,
-                              text="Verificar y Generar Código",
-                              command=self.verify_2fa,
-                              bg='#0d7377',
-                              fg='white',
-                              font=('Arial', 11, 'bold'),
-                              padx=20,
-                              pady=8,
-                              cursor='hand2',
-                              relief='flat')
-        verify_btn.pack(pady=20)
+        verify_btn = ModernButton("Verificar y Generar Código")
+        verify_btn.clicked.connect(self.verify_2fa)
+        card_layout.addWidget(verify_btn)
         
         # Frame para el código (inicialmente oculto)
-        self.code_frame = tk.Frame(main_frame, bg='#1e1e1e')
-        self.code_frame.pack(pady=20)
+        self.code_frame = QWidget()
+        self.code_layout = QVBoxLayout(self.code_frame)
+        self.code_layout.setSpacing(15)
+        card_layout.addWidget(self.code_frame)
+        self.code_frame.hide()
+        
+        layout.addWidget(card)
+        
+        # Spacer inferior
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        
+        # Configurar Enter key
+        self.password_2fa_entry.returnPressed.connect(self.verify_2fa)
+        
+        self.stacked_widget.addWidget(widget)
+        self.stacked_widget.setCurrentWidget(widget)
     
     def verify_2fa(self):
         """Verifica la contraseña 2FA y muestra el código"""
-        password_2fa = self.password_2fa_entry.get()
+        password_2fa = self.password_2fa_entry.text()
         
         if not password_2fa:
-            messagebox.showerror("Error", "Por favor ingrese la contraseña 2FA")
+            self.show_message("Error", "Por favor ingrese la contraseña 2FA", "warning")
             return
         
-        # Verificar contraseña 2FA
-        from unittest.mock import patch
-        
-        with patch('getpass.getpass', return_value=password_2fa):
-            if verificar_2fa(self.current_user):
-                # Generar y mostrar código
-                code = obtener_codigo_2fa()
-                self.show_code_input(code)
-            else:
-                messagebox.showerror("Error", "Contraseña 2FA incorrecta")
+        try:
+            # Verificar contraseña 2FA
+            from unittest.mock import patch
+            
+            with patch('getpass.getpass', return_value=password_2fa):
+                if verificar_2fa(self.current_user):
+                    # Generar y mostrar código
+                    code = obtener_codigo_2fa()
+                    self.show_code_input(code)
+                else:
+                    self.show_message("Error", "Contraseña 2FA incorrecta", "warning")
+                    self.password_2fa_entry.clear()
+                    
+        except Exception as e:
+            self.show_message("Error", f"Error en la verificación 2FA: {str(e)}", "critical")
     
     def show_code_input(self, generated_code):
         """Muestra el campo para ingresar el código"""
         # Limpiar frame de código
-        for widget in self.code_frame.winfo_children():
-            widget.destroy()
+        for i in reversed(range(self.code_layout.count())):
+            self.code_layout.itemAt(i).widget().setParent(None)
         
         # Mostrar código generado
-        code_display = tk.Frame(self.code_frame, bg='#0d7377', relief='solid', bd=2)
-        code_display.pack(pady=10)
+        code_display = QFrame()
+        code_display.setStyleSheet("""
+            QFrame {
+                background-color: #0d7377;
+                border-radius: 8px;
+                border: 2px solid #14ae5c;
+            }
+        """)
+        code_display_layout = QVBoxLayout(code_display)
+        code_display_layout.setContentsMargins(20, 15, 20, 15)
         
-        tk.Label(code_display, 
-                text=f"Código: {generated_code}",
-                bg='#0d7377',
-                fg='white',
-                font=('Arial', 16, 'bold'),
-                padx=20,
-                pady=10).pack()
+        code_label = QLabel(f"Código: {generated_code}")
+        code_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        code_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
+                font-family: 'Consolas', 'Courier New', monospace;
+            }
+        """)
+        code_display_layout.addWidget(code_label)
+        
+        self.code_layout.addWidget(code_display)
         
         # Campo para ingresar código
-        ttk.Label(self.code_frame, 
-                 text="Ingrese el código mostrado:",
-                 style='Regular.TLabel').pack(pady=(20, 5))
+        instruction = QLabel("Ingrese el código mostrado arriba:")
+        instruction.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        instruction.setStyleSheet("color: #cccccc; font-size: 14px;")
+        self.code_layout.addWidget(instruction)
         
-        self.code_entry = ttk.Entry(self.code_frame, width=20, font=('Arial', 14))
-        self.code_entry.pack(pady=5)
-        self.code_entry.focus()
+        self.code_entry = ModernLineEdit("Código de verificación")
+        self.code_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.code_layout.addWidget(self.code_entry)
         
         # Botón confirmar
-        confirm_btn = tk.Button(self.code_frame,
-                               text="Confirmar",
-                               command=lambda: self.confirm_code(generated_code),
-                               bg='#14ae5c',
-                               fg='white',
-                               font=('Arial', 11, 'bold'),
-                               padx=30,
-                               pady=8,
-                               cursor='hand2',
-                               relief='flat')
-        confirm_btn.pack(pady=15)
+        confirm_btn = ModernButton("Confirmar Código", "success")
+        confirm_btn.clicked.connect(lambda: self.confirm_code(generated_code))
+        self.code_layout.addWidget(confirm_btn)
         
-        # Bind Enter
-        self.code_entry.bind('<Return>', lambda e: self.confirm_code(generated_code))
+        # Mostrar el frame y enfocar
+        self.code_frame.show()
+        self.code_entry.setFocus()
+        
+        # Configurar Enter key
+        self.code_entry.returnPressed.connect(lambda: self.confirm_code(generated_code))
     
     def confirm_code(self, correct_code):
         """Confirma el código ingresado"""
-        entered_code = self.code_entry.get()
+        entered_code = self.code_entry.text()
         
         if entered_code == correct_code:
-            messagebox.showinfo("Éxito", "¡Autenticación completa!")
-            self.root.destroy()
-            # Llamar al callback con los datos de sesión
-            self.on_success(self.current_user, self.fernet_key)
+            self.show_message("Éxito", "¡Autenticación completada exitosamente!", "info")
+            
+            # Cerrar con animación
+            QTimer.singleShot(1000, self.close_and_callback)
         else:
-            messagebox.showerror("Error", "Código incorrecto")
-            self.code_entry.delete(0, tk.END)
-            self.code_entry.focus()
+            self.show_message("Error", "Código incorrecto, intente nuevamente", "warning")
+            self.code_entry.clear()
+            self.code_entry.setFocus()
     
-    def run(self):
-        """Ejecuta la ventana de login"""
-        self.root.mainloop()
+    def close_and_callback(self):
+        """Cierra la ventana y ejecuta el callback"""
+        self.close()
+        self.on_success(self.current_user, self.fernet_key)
+    
+    def show_message(self, title, message, icon_type="info"):
+        """Muestra un mensaje con estilo moderno"""
+        msg = QMessageBox(self)
+        msg.setWindowTitle(title)
+        msg.setText(message)
+        
+        # Configurar icono
+        if icon_type == "info":
+            msg.setIcon(QMessageBox.Icon.Information)
+        elif icon_type == "warning":
+            msg.setIcon(QMessageBox.Icon.Warning)
+        elif icon_type == "critical":
+            msg.setIcon(QMessageBox.Icon.Critical)
+        
+        # Estilo moderno para el message box
+        msg.setStyleSheet("""
+            QMessageBox {
+                background-color: #2d2d2d;
+                color: white;
+            }
+            QMessageBox QPushButton {
+                background-color: #0d7377;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #0a5d61;
+            }
+        """)
+        
+        msg.exec()
 
 
-# Función helper para iniciar el login
 def start_login(on_success_callback):
     """
     Inicia la ventana de login
     on_success_callback: función que se llama cuando el login es exitoso
                         recibe (admin_user, fernet_key)
     """
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    
+    # Configurar estilo global de la aplicación
+    app.setStyleSheet("""
+        QApplication {
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+    """)
+    
     login = LoginWindow(on_success_callback)
-    login.run()
+    login.show()
+    
+    if app.exec() != 0:
+        sys.exit()
+
+
+if __name__ == "__main__":
+    def test_callback(user, key):
+        print(f"Login exitoso para: {user.username}")
+        print("Fernet key obtenida correctamente")
+    
+    start_login(test_callback)
