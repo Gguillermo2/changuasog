@@ -1,22 +1,30 @@
 # main.py
 import sys
-import os
-
-# Agregar el directorio raíz al path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
+from PySide6.QtWidgets import QApplication
 from Vista.login import start_login
-from Vista.home import start_home
+from Vista.home import HomeWindow
 
 def main():
-    """Función principal que inicia la aplicación"""
-    # Callback que se ejecuta cuando el login es exitoso
+    app = QApplication(sys.argv)
+    
+    # Configurar estilo global
+    app.setStyleSheet("""
+        QApplication {
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+    """)
+    
     def on_login_success(admin_user, fernet_key):
-        # Iniciar la ventana principal
-        start_home(admin_user, fernet_key)
+        """Callback cuando el login es exitoso"""
+        # Cerrar ventana de login y abrir home
+        home = HomeWindow(admin_user, fernet_key)
+        home.show()
     
     # Iniciar con la ventana de login
-    start_login(on_login_success)
+    login = start_login(on_login_success)
+    login.show()
+    
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()

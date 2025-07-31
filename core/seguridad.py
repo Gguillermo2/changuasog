@@ -1,3 +1,4 @@
+#core/seguridad.py
 import os
 import bcrypt
 import random
