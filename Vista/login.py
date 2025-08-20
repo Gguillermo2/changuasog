@@ -585,8 +585,7 @@ def start_login(on_success_callback):
     login = LoginWindow(on_success_callback)
     login.show()
     
-    if app.exec() != 0:
-        sys.exit()
+    return login
 
 
 if __name__ == "__main__":

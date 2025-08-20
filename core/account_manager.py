@@ -1,4 +1,3 @@
-#core/account_manager.py
 from typing import List, Optional
 from datetime import datetime
 from Modelo.models import Account
@@ -110,3 +109,6 @@ class AccountManager:
             )
         
         return summary
+    
+"""    def get_all_accounts(self) -> List[Account]:
+        return self.accounts"""

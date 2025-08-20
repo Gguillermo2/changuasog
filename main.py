@@ -1,7 +1,7 @@
 # main.py
 import sys
 from PySide6.QtWidgets import QApplication
-from Vista.login import start_login
+from Vista.login import LoginWindow, start_login
 from Vista.home import HomeWindow
 
 def main():
@@ -21,7 +21,7 @@ def main():
         home.show()
     
     # Iniciar con la ventana de login
-    login = start_login(on_login_success)
+    login = LoginWindow(on_login_success)
     login.show()
     
     sys.exit(app.exec())
