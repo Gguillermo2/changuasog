@@ -52,32 +52,32 @@ class HomeWindow:
         
         # Configurar colores generales
         style.configure('.',
-                       background='#1e1e1e',
-                       foreground='white',
-                       borderwidth=0,
-                       focuscolor='none')
+                        background='#1e1e1e',
+                        foreground='white',
+                        borderwidth=0,
+                        focuscolor='none')
         
         # Treeview
         style.configure('Treeview',
-                       background='#2d2d2d',
-                       foreground='white',
-                       rowheight=25,
-                       fieldbackground='#2d2d2d',
-                       borderwidth=0)
+                        background='#2d2d2d',
+                        foreground='white',
+                        rowheight=25,
+                        fieldbackground='#2d2d2d',
+                        borderwidth=0)
         style.map('Treeview',
-                 background=[('selected', '#0d7377')])
+                background=[('selected', '#0d7377')])
         
         # Headers
         style.configure('Treeview.Heading',
-                       background='#252525',
-                       foreground='white',
-                       relief='flat')
+                background='#252525',
+                foreground='white',
+                    relief='flat')
         
         # Labels
         style.configure('Title.TLabel',
-                       font=('Arial', 14, 'bold'))
+            font=('Arial', 14, 'bold'))
         style.configure('Subtitle.TLabel',
-                       font=('Arial', 11))
+            font=('Arial', 11))
     
     def create_widgets(self):
         """Crea todos los widgets de la interfaz"""
@@ -131,15 +131,15 @@ class HomeWindow:
                 font=('Arial', 11)).pack()
         
         logout_btn = tk.Button(right_frame,
-                              text="Cerrar Sesión",
-                              command=self.logout,
-                              bg='#d32f2f',
-                              fg='white',
-                              font=('Arial', 10),
-                              padx=15,
-                              pady=5,
-                              cursor='hand2',
-                              relief='flat')
+                            text="Cerrar Sesión",
+                            command=self.logout,
+                            bg='#d32f2f',
+                            fg='white',
+                            font=('Arial', 10),
+                            padx=15,
+                            pady=5,
+                            cursor='hand2',
+                            relief='flat')
         logout_btn.pack(side='right', pady=15)
     
     def create_left_panel(self, parent):
@@ -153,20 +153,20 @@ class HomeWindow:
         controls_frame.pack(fill='x', padx=10, pady=10)
         
         ttk.Label(controls_frame,
-                 text="Cuentas Guardadas",
-                 style='Title.TLabel').pack(side='left')
+                text="Cuentas Guardadas",
+                style='Title.TLabel').pack(side='left')
         
         # Botón agregar
         add_btn = tk.Button(controls_frame,
-                           text="+ Nueva",
-                           command=self.show_add_account_dialog,
-                           bg='#14ae5c',
-                           fg='white',
-                           font=('Arial', 10),
-                           padx=15,
-                           pady=5,
-                           cursor='hand2',
-                           relief='flat')
+                        text="+ Nueva",
+                        command=self.show_add_account_dialog,
+                        bg='#14ae5c',
+                        fg='white',
+                        font=('Arial', 10),
+                        padx=15,
+                        pady=5,
+                        cursor='hand2',
+                        relief='flat')
         add_btn.pack(side='right')
         
         # Búsqueda
@@ -186,10 +186,10 @@ class HomeWindow:
         categories = ["Todas"] + self.account_manager.get_all_categories()
         
         category_combo = ttk.Combobox(search_frame,
-                                     textvariable=self.category_var,
-                                     values=categories,
-                                     state='readonly',
-                                     width=15)
+                                    textvariable=self.category_var,
+                                    values=categories,
+                                    state='readonly',
+                                    width=15)
         category_combo.pack(side='right')
         category_combo.bind('<<ComboboxSelected>>', lambda e: self.filter_accounts())
         
@@ -203,9 +203,9 @@ class HomeWindow:
         
         # Treeview
         self.accounts_tree = ttk.Treeview(tree_frame,
-                                         columns=('Usuario', 'Categoría'),
-                                         show='tree headings',
-                                         yscrollcommand=scrollbar.set)
+                                columns=('Usuario', 'Categoría'),
+                                show='tree headings',
+                                yscrollcommand=scrollbar.set)
         self.accounts_tree.pack(side='left', fill='both', expand=True)
         scrollbar.config(command=self.accounts_tree.yview)
         

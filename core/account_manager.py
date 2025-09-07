@@ -1,3 +1,4 @@
+# core/account_manager.py
 from typing import List, Optional
 from datetime import datetime
 from Modelo.models import Account
@@ -21,7 +22,7 @@ class AccountManager:
         save_accounts_data(self.accounts, self.fernet_key)
     
     def create_account(self, platform: str, email_or_username: str, 
-                      password: str, category: str, notes: str = "") -> Account:
+                    password: str, category: str, notes: str = "") -> Account:
         """Crea una nueva cuenta"""
         new_account = Account(
             platform=platform,

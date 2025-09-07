@@ -1,8 +1,9 @@
+# core/autenticacion
 import getpass
 from Modelo.models import AdminUser
 # Importar las nuevas funciones de seguridad
 from core.seguridad import hash_password_bcrypt, check_password_bcrypt, generate_2fa, \
-                           generate_salt, generate_fernet_key_from_password
+                        generate_salt, generate_fernet_key_from_password
 from core.almacenamiento import save_jsonD, load_json_data
 from base64 import urlsafe_b64encode, urlsafe_b64decode # Necesario para codificar/decodificar el salt
 

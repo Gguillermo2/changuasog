@@ -2,19 +2,36 @@
 import os
 import json
 from typing import List, Dict, Optional
+from pathlib import Path
 from core.seguridad import encrypt_data_fernet, decrypt_data_fernet 
-from Modelo.models import Account  # Cambiado de Cuentas
-from core.seguridad import _ensure_db_directory_exists as ensure_db_directory_E
+from Modelo.models import Account
 
-RUTA_DBWROSER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "DBwroser")
+# Obtener directorio de AppData
+def get_appdata_dir():
+    """Obtiene el directorio de la aplicación en AppData"""
+    appdata = os.getenv('APPDATA')
+    if not appdata:
+        appdata = os.path.expanduser('~')
+    
+    app_dir = Path(appdata) / "GestorDeCuentasWroser"
+    app_dir.mkdir(exist_ok=True)
+    return app_dir
+
+# Configurar rutas
+RUTA_DBWROSER = get_appdata_dir()
 PASSWORDS_DATA_FILE = "passwords_data.json"
+
+def ensure_db_directory():
+    """Asegura que el directorio de la base de datos exista (en AppData)"""
+    RUTA_DBWROSER.mkdir(exist_ok=True)
+    return True
 
 def save_jsonD(filename: str, data: dict):
     """
-    Guarda datos en un archivo JSON en el directorio DBwroser.
+    Guarda datos en un archivo JSON en el directorio DBwroser (AppData).
     """
-    ensure_db_directory_E()
-    full_path = os.path.join(RUTA_DBWROSER, filename)
+    ensure_db_directory()
+    full_path = RUTA_DBWROSER / filename
     try:
         with open(full_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
@@ -23,9 +40,9 @@ def save_jsonD(filename: str, data: dict):
         print(f"❌ Error al guardar datos en {full_path}: {e}")
 
 def load_json_data(filename: str) -> Optional[Dict]:
-    """Carga datos de un archivo JSON desde DBwroser."""
-    full_path = os.path.join(RUTA_DBWROSER, filename)
-    if os.path.exists(full_path):
+    """Carga datos de un archivo JSON desde DBwroser (AppData)."""
+    full_path = RUTA_DBWROSER / filename
+    if full_path.exists():
         try:
             with open(full_path, "r", encoding="utf-8") as file:
                 return json.load(file)
@@ -33,7 +50,7 @@ def load_json_data(filename: str) -> Optional[Dict]:
             print(f"❌ Error al decodificar JSON de {full_path}: {e}")
             return None
         except IOError as e:
-            print(f"❌ Error al cargar datos de {full_path}: {e}")
+            print(f"❌ Error al cargando datos de {full_path}: {e}")
             return None
     return None   
 
@@ -42,7 +59,7 @@ def save_accounts_data(accounts: List[Account], fernet_key: bytes):
     Cifra y guarda los datos de las cuentas en el archivo JSON.
     Requiere la clave Fernet activa de la sesión.
     """
-    ensure_db_directory_E()
+    ensure_db_directory()
     
     encrypted_data = []
     for account in accounts:
@@ -68,7 +85,7 @@ def load_accounts_data(fernet_key: bytes) -> List[Account]:
     Carga y descifra los datos de las cuentas desde el archivo JSON.
     Requiere la clave Fernet activa de la sesión.
     """
-    ensure_db_directory_E()
+    ensure_db_directory()
 
     data = load_json_data(PASSWORDS_DATA_FILE)
     if not data or "accounts" not in data:
