@@ -1,0 +1,14 @@
+# Ignorar archivos generados por PyInstaller
+.vevn/
+build/
+dist/
+*.spec
+
+# Ignorar las carpetas __pycache__ y los archivos .pyc
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+# Ignorar otros archivos comunes de Python
+.vscode/
+PRO/
