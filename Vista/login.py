@@ -1,4 +1,4 @@
-# views/login.py - Versión PySide6
+# views/login.py - Versión PySide6 CORREGIDA
 import sys
 import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
@@ -105,7 +105,7 @@ class ModernButton(QPushButton):
 class LoginWindow(QMainWindow):
     def __init__(self, on_success_callback):
         super().__init__()
-        self.on_success = on_success_callback
+        self.on_success_callback = on_success_callback  # CORREGIDO: nombre consistente
         self.current_user = None
         self.fernet_key = None
         
@@ -210,16 +210,16 @@ class LoginWindow(QMainWindow):
         card_layout.setSpacing(20)
         
         # Campos del formulario
-        self.username_entry = ModernLineEdit("Ingrese su nombre de usuario")
-        self.password_entry = ModernLineEdit("Contraseña maestra", True)
-        self.password_2fa_entry = ModernLineEdit("Contraseña para 2FA", True)
+        self.create_username_entry = ModernLineEdit("Ingrese su nombre de usuario")
+        self.create_password_entry = ModernLineEdit("Contraseña maestra", True)
+        self.create_password_2fa_entry = ModernLineEdit("Contraseña para 2FA", True)
         
         card_layout.addWidget(QLabel("Nombre de usuario:"))
-        card_layout.addWidget(self.username_entry)
+        card_layout.addWidget(self.create_username_entry)
         card_layout.addWidget(QLabel("Contraseña maestra:"))
-        card_layout.addWidget(self.password_entry)
+        card_layout.addWidget(self.create_password_entry)
         card_layout.addWidget(QLabel("Contraseña para 2FA:"))
-        card_layout.addWidget(self.password_2fa_entry)
+        card_layout.addWidget(self.create_password_2fa_entry)
         
         # Botón crear
         create_btn = ModernButton("Crear Usuario Administrador")
@@ -236,9 +236,9 @@ class LoginWindow(QMainWindow):
     
     def create_admin(self):
         """Crea el usuario administrador"""
-        username = self.username_entry.text()
-        password = self.password_entry.text()
-        password_2fa = self.password_2fa_entry.text()
+        username = self.create_username_entry.text()
+        password = self.create_password_entry.text()
+        password_2fa = self.create_password_2fa_entry.text()
         
         if not all([username, password, password_2fa]):
             self.show_message("Error", "Todos los campos son obligatorios", "warning")
@@ -318,11 +318,11 @@ class LoginWindow(QMainWindow):
         card_layout.setSpacing(20)
         
         # Campos de login
-        self.username_entry = ModernLineEdit("Usuario")
-        self.password_entry = ModernLineEdit("Contraseña", True)
+        self.login_username_entry = ModernLineEdit("Usuario")
+        self.login_password_entry = ModernLineEdit("Contraseña", True)
         
-        card_layout.addWidget(self.username_entry)
-        card_layout.addWidget(self.password_entry)
+        card_layout.addWidget(self.login_username_entry)
+        card_layout.addWidget(self.login_password_entry)
         
         # Botón de login
         login_btn = ModernButton("Iniciar Sesión")
@@ -335,16 +335,16 @@ class LoginWindow(QMainWindow):
         layout.addSpacerItem(QSpacerItem(20, 60, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # Configurar Enter key
-        self.username_entry.returnPressed.connect(self.attempt_login)
-        self.password_entry.returnPressed.connect(self.attempt_login)
+        self.login_username_entry.returnPressed.connect(self.attempt_login)
+        self.login_password_entry.returnPressed.connect(self.attempt_login)
         
         self.stacked_widget.addWidget(widget)
         self.stacked_widget.setCurrentWidget(widget)
     
     def attempt_login(self):
         """Intenta hacer login con las credenciales"""
-        username = self.username_entry.text()
-        password = self.password_entry.text()
+        username = self.login_username_entry.text()
+        password = self.login_password_entry.text()
         
         if not username or not password:
             self.show_message("Error", "Por favor complete todos los campos", "warning")
@@ -364,73 +364,68 @@ class LoginWindow(QMainWindow):
                 self.show_2fa_screen()
             else:
                 self.show_message("Error", "Usuario o contraseña incorrectos", "warning")
-                self.password_entry.clear()
+                self.login_password_entry.clear()
                 
         except Exception as e:
             self.show_message("Error", f"Error en la autenticación: {str(e)}", "critical")
     
     def show_2fa_screen(self):
-        """Muestra la pantalla de 2FA"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(25)
-        
-        # Spacer superior
-        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-        
-        # Título
-        title = QLabel("🔒 Verificación de Dos Factores")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("""
-            QLabel {
-                font-size: 22px;
-                font-weight: bold;
-                color: #0d7377;
-                margin-bottom: 10px;
-            }
-        """)
-        layout.addWidget(title)
-        
-        # Instrucciones
-        info_label = QLabel("Ingrese su contraseña de 2FA para generar el código de verificación")
-        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #cccccc; font-size: 14px; margin-bottom: 20px;")
-        layout.addWidget(info_label)
-        
-        # Tarjeta de 2FA
-        card = self.create_card_frame()
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(30, 30, 30, 30)
-        card_layout.setSpacing(20)
-        
-        # Campo contraseña 2FA
-        self.password_2fa_entry = ModernLineEdit("Contraseña 2FA", True)
-        card_layout.addWidget(self.password_2fa_entry)
-        
-        # Botón verificar
-        verify_btn = ModernButton("Verificar y Generar Código")
-        verify_btn.clicked.connect(self.verify_2fa)
-        card_layout.addWidget(verify_btn)
-        
-        # Frame para el código (inicialmente oculto)
-        self.code_frame = QWidget()
-        self.code_layout = QVBoxLayout(self.code_frame)
-        self.code_layout.setSpacing(15)
-        card_layout.addWidget(self.code_frame)
-        self.code_frame.hide()
-        
-        layout.addWidget(card)
-        
-        # Spacer inferior
-        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-        
-        # Configurar Enter key
-        self.password_2fa_entry.returnPressed.connect(self.verify_2fa)
-        
-        self.stacked_widget.addWidget(widget)
-        self.stacked_widget.setCurrentWidget(widget)
+        """Muestra la pantalla de verificación 2FA"""
+        try:
+            widget = QWidget()
+            layout = QVBoxLayout(widget)
+            layout.setContentsMargins(40, 40, 40, 40)
+            layout.setSpacing(20)
+            
+            # Título
+            title = QLabel("🔑 Verificación en Dos Pasos")
+            title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            title.setStyleSheet("""
+                QLabel {
+                    font-size: 24px;
+                    font-weight: bold;
+                    color: #0d7377;
+                    margin-bottom: 10px;
+                }
+            """)
+            layout.addWidget(title)
+            
+            # Instrucciones
+            instructions = QLabel("Por favor ingrese la contraseña 2FA para generar un código de verificación:")
+            instructions.setWordWrap(True)
+            instructions.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            instructions.setStyleSheet("color: #cccccc; font-size: 14px; margin-bottom: 20px;")
+            layout.addWidget(instructions)
+            
+            # Campo para contraseña 2FA
+            self.password_2fa_entry = ModernLineEdit("Contraseña 2FA", True)
+            
+            # Botón verificar
+            verify_btn = ModernButton("Verificar y Generar Código")
+            verify_btn.clicked.connect(self.verify_2fa)
+            
+            # Frame para el código (se mostrará después)
+            self.code_frame = QFrame()
+            self.code_layout = QVBoxLayout(self.code_frame)
+            self.code_layout.setContentsMargins(0, 0, 0, 0)
+            self.code_layout.setSpacing(15)
+            self.code_frame.hide()
+            
+            # Agregar widgets al layout
+            layout.addWidget(self.password_2fa_entry)
+            layout.addWidget(verify_btn)
+            layout.addSpacing(20)
+            layout.addWidget(self.code_frame)
+            
+            # Configurar Enter key
+            self.password_2fa_entry.returnPressed.connect(self.verify_2fa)
+            
+            # Agregar widget al stack
+            self.stacked_widget.addWidget(widget)
+            self.stacked_widget.setCurrentWidget(widget)
+            
+        except Exception as e:
+            self.show_message("Error", f"Error al mostrar la pantalla 2FA: {str(e)}", "critical")
     
     def verify_2fa(self):
         """Verifica la contraseña 2FA y muestra el código"""
@@ -460,28 +455,35 @@ class LoginWindow(QMainWindow):
         """Muestra el campo para ingresar el código"""
         # Limpiar frame de código
         for i in reversed(range(self.code_layout.count())):
-            self.code_layout.itemAt(i).widget().setParent(None)
+            widget = self.code_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
         
         # Mostrar código generado
         code_display = QFrame()
         code_display.setStyleSheet("""
             QFrame {
-                background-color: #0d7377;
-                border-radius: 8px;
-                border: 2px solid #14ae5c;
+                border-radius: 12px;
+                border: 2px solid #0d7377;
+                padding: 15px;
             }
         """)
         code_display_layout = QVBoxLayout(code_display)
         code_display_layout.setContentsMargins(20, 15, 20, 15)
         
-        code_label = QLabel(f"Código: {generated_code}")
+        code_label = QLabel(f"{generated_code}")
         code_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         code_label.setStyleSheet("""
             QLabel {
-                color: white;
-                font-size: 20px;
+                color: #0d7377;
+                font-size: 24px;
                 font-weight: bold;
                 font-family: 'Consolas', 'Courier New', monospace;
+                background-color: rgba(13, 115, 119, 0.1);
+                border-radius: 8px;
+                padding: 15px;
+                letter-spacing: 5px;
+                border: 1px solid #0d7377;
             }
         """)
         code_display_layout.addWidget(code_label)
@@ -517,8 +519,8 @@ class LoginWindow(QMainWindow):
         if entered_code == correct_code:
             self.show_message("Éxito", "¡Autenticación completada exitosamente!", "info")
             
-            # Cerrar con animación
-            QTimer.singleShot(1000, self.close_and_callback)
+            # Programar cierre y callback
+            QTimer.singleShot(500, self.close_and_callback)
         else:
             self.show_message("Error", "Código incorrecto, intente nuevamente", "warning")
             self.code_entry.clear()
@@ -526,8 +528,20 @@ class LoginWindow(QMainWindow):
     
     def close_and_callback(self):
         """Cierra la ventana y ejecuta el callback"""
-        self.close()
-        self.on_success(self.current_user, self.fernet_key)
+        try:
+            if self.on_success_callback and self.current_user and self.fernet_key:
+                # Ocultar primero
+                self.hide()
+                # Llamar al callback
+                self.on_success_callback(self.current_user, self.fernet_key)
+                # Luego cerrar
+                self.close()
+            else:
+                self.show_message("Error", "Faltan datos para continuar", "critical")
+        except Exception as e:
+            print(f"Error en close_and_callback: {e}")
+            import traceback
+            traceback.print_exc()
     
     def show_message(self, title, message, icon_type="info"):
         """Muestra un mensaje con estilo moderno"""
@@ -542,8 +556,7 @@ class LoginWindow(QMainWindow):
             msg.setIcon(QMessageBox.Icon.Warning)
         elif icon_type == "critical":
             msg.setIcon(QMessageBox.Icon.Critical)
-        
-        # Estilo moderno para el message box
+    
         msg.setStyleSheet("""
             QMessageBox {
                 background-color: #2d2d2d;
@@ -561,36 +574,4 @@ class LoginWindow(QMainWindow):
                 background-color: #0a5d61;
             }
         """)
-        
         msg.exec()
-
-
-def start_login(on_success_callback):
-    """
-    Inicia la ventana de login
-    on_success_callback: función que se llama cuando el login es exitoso
-                        recibe (admin_user, fernet_key)
-    """
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    
-    # Configurar estilo global de la aplicación
-    app.setStyleSheet("""
-        QApplication {
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-    """)
-    
-    login = LoginWindow(on_success_callback)
-    login.show()
-    
-    return login
-
-
-if __name__ == "__main__":
-    def test_callback(user, key):
-        print(f"Login exitoso para: {user.username}")
-        print("Fernet key obtenida correctamente")
-    
-    start_login(test_callback)

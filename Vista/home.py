@@ -1,4 +1,4 @@
-# views/home.py - Versión PySide6
+# views/home.py - Versión PySide6 CORREGIDA
 import sys
 import os
 from datetime import datetime
@@ -219,7 +219,7 @@ class CategoryDelegate(QStyledItemDelegate):
     }
     
     def paint(self, painter, option, index):
-        if index.column() == 4:  # Columna de categoría
+        if index.column() == 3:  # Columna de categoría (ahora es la 3)
             painter.save()
             
             # Obtener el texto de la categoría
@@ -259,7 +259,7 @@ class AccountDialog(QDialog):
         super().__init__(parent)
         self.account = account
         self.setWindowTitle("Editar Cuenta" if account else "Nueva Cuenta")
-        self.setFixedSize(500, 600)
+        self.setFixedSize(500, 550)
         self.setModal(True)
         
         self.setup_ui()
@@ -286,7 +286,7 @@ class AccountDialog(QDialog):
         layout.setSpacing(15)
         
         # Título
-        title = QLabel("📝 " + ("Editar Cuenta" if self.account else "Nueva Cuenta"))
+        title = QLabel("🔐 " + ("Editar Cuenta" if self.account else "Nueva Cuenta"))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
             QLabel {
@@ -299,13 +299,13 @@ class AccountDialog(QDialog):
         layout.addWidget(title)
         
         # Campos del formulario
-        layout.addWidget(QLabel("Nombre de la cuenta:"))
-        self.name_entry = ModernLineEdit("Ej: Gmail Personal")
-        layout.addWidget(self.name_entry)
+        layout.addWidget(QLabel("Plataforma/Servicio:"))
+        self.platform_entry = ModernLineEdit("Ej: Gmail, Netflix, etc.")
+        layout.addWidget(self.platform_entry)
         
-        layout.addWidget(QLabel("Nombre de usuario:"))
-        self.username_entry = ModernLineEdit("Ej: usuario@gmail.com")
-        layout.addWidget(self.username_entry)
+        layout.addWidget(QLabel("Email o Usuario:"))
+        self.email_entry = ModernLineEdit("Ej: usuario@gmail.com")
+        layout.addWidget(self.email_entry)
         
         layout.addWidget(QLabel("Contraseña:"))
         password_layout = QHBoxLayout()
@@ -316,10 +316,6 @@ class AccountDialog(QDialog):
         password_layout.addWidget(self.password_entry)
         password_layout.addWidget(self.toggle_password_btn)
         layout.addLayout(password_layout)
-        
-        layout.addWidget(QLabel("URL (opcional):"))
-        self.url_entry = ModernLineEdit("Ej: https://mail.google.com")
-        layout.addWidget(self.url_entry)
         
         layout.addWidget(QLabel("Categoría:"))
         self.category_combo = ModernComboBox()
@@ -362,35 +358,34 @@ class AccountDialog(QDialog):
     
     def load_account_data(self):
         """Carga los datos de la cuenta en el formulario"""
-        self.name_entry.setText(self.account.name)
-        self.username_entry.setText(self.account.username)
+        self.platform_entry.setText(self.account.platform)
+        self.email_entry.setText(self.account.email_or_username)
         self.password_entry.setText(self.account.password)
-        self.url_entry.setText(self.account.url or "")
         self.category_combo.setCurrentText(self.account.category)
         self.notes_entry.setText(self.account.notes or "")
     
     def save_account(self):
         """Valida y guarda la cuenta"""
         # Validar campos requeridos
-        if not all([self.name_entry.text(), self.username_entry.text(), self.password_entry.text()]):
+        if not all([self.platform_entry.text(), self.email_entry.text(), self.password_entry.text()]):
             QMessageBox.warning(self, "Error", "Por favor complete todos los campos obligatorios")
             return
         
-        # Crear o actualizar cuenta
+        # Crear o actualizar cuenta usando los nombres correctos del modelo
         account_data = {
-            "name": self.name_entry.text(),
-            "username": self.username_entry.text(),
+            "platform": self.platform_entry.text(),
+            "email_or_username": self.email_entry.text(),
             "password": self.password_entry.text(),
-            "url": self.url_entry.text() or None,
             "category": self.category_combo.currentText(),
             "notes": self.notes_entry.toPlainText() or None,
-            "last_modified": datetime.now().isoformat()
+            "updated_at": datetime.now().isoformat()
         }
         
         if self.account:
-            account_data["id"] = self.account.id
+            # Si es edición, preservar created_at
             account_data["created_at"] = self.account.created_at
         else:
+            # Si es nueva, agregar created_at
             account_data["created_at"] = datetime.now().isoformat()
         
         self.account_data = account_data
@@ -403,6 +398,7 @@ class HomeWindow(QMainWindow):
         self.admin_user = admin_user
         self.fernet_key = fernet_key
         self.account_manager = AccountManager(fernet_key)
+        self.accounts_list = []  # Lista para mantener las cuentas con IDs
         
         self.setup_ui()
         self.load_accounts()
@@ -569,11 +565,11 @@ class HomeWindow(QMainWindow):
         table_layout = QVBoxLayout(table_frame)
         table_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Tabla
+        # Tabla con 5 columnas ahora
         self.accounts_table = QTableWidget()
-        self.accounts_table.setColumnCount(6)
+        self.accounts_table.setColumnCount(5)
         self.accounts_table.setHorizontalHeaderLabels([
-            "Nombre", "Usuario", "Contraseña", "URL", "Categoría", "Acciones"
+            "Plataforma", "Usuario/Email", "Contraseña", "Categoría", "Acciones"
         ])
         
         # Estilo de la tabla
@@ -616,14 +612,13 @@ class HomeWindow(QMainWindow):
         self.accounts_table.verticalHeader().setVisible(False)
         
         # Configurar ancho de columnas
-        self.accounts_table.setColumnWidth(0, 200)  # Nombre
-        self.accounts_table.setColumnWidth(1, 250)  # Usuario
+        self.accounts_table.setColumnWidth(0, 200)  # Plataforma
+        self.accounts_table.setColumnWidth(1, 250)  # Usuario/Email
         self.accounts_table.setColumnWidth(2, 200)  # Contraseña
-        self.accounts_table.setColumnWidth(3, 200)  # URL
-        self.accounts_table.setColumnWidth(4, 150)  # Categoría
+        self.accounts_table.setColumnWidth(3, 150)  # Categoría
         
-        # Aplicar delegado personalizado para categorías
-        self.accounts_table.setItemDelegateForColumn(4, CategoryDelegate())
+        # Aplicar delegado personalizado para categorías (ahora columna 3)
+        self.accounts_table.setItemDelegateForColumn(3, CategoryDelegate())
         
         table_layout.addWidget(self.accounts_table)
         
@@ -712,9 +707,23 @@ class HomeWindow(QMainWindow):
     
     def load_accounts(self):
         """Carga todas las cuentas en la tabla"""
-        accounts = self.account_manager.get_all_accounts()
-        self.display_accounts(accounts)
-        self.update_stats(accounts)
+        try:
+            accounts = self.account_manager.get_all_accounts()
+            # Asignar IDs a las cuentas para poder identificarlas
+            self.accounts_list = []
+            for i, account in enumerate(accounts):
+                # Agregar un ID temporal si no existe
+                if not hasattr(account, 'id'):
+                    account.id = i
+                self.accounts_list.append(account)
+            
+            self.display_accounts(self.accounts_list)
+            self.update_stats(self.accounts_list)
+        except Exception as e:
+            print(f"Error cargando cuentas: {e}")
+            self.accounts_list = []
+            self.display_accounts([])
+            self.update_stats([])
     
     def display_accounts(self, accounts):
         """Muestra las cuentas en la tabla"""
@@ -724,22 +733,19 @@ class HomeWindow(QMainWindow):
             row = self.accounts_table.rowCount()
             self.accounts_table.insertRow(row)
             
-            # Nombre
-            self.accounts_table.setItem(row, 0, QTableWidgetItem(account.name))
+            # Plataforma
+            self.accounts_table.setItem(row, 0, QTableWidgetItem(account.platform))
             
-            # Usuario
-            self.accounts_table.setItem(row, 1, QTableWidgetItem(account.username))
+            # Usuario/Email
+            self.accounts_table.setItem(row, 1, QTableWidgetItem(account.email_or_username))
             
             # Contraseña (oculta)
             password_item = QTableWidgetItem("••••••••")
             password_item.setData(Qt.ItemDataRole.UserRole, account.password)
             self.accounts_table.setItem(row, 2, password_item)
             
-            # URL
-            self.accounts_table.setItem(row, 3, QTableWidgetItem(account.url or ""))
-            
             # Categoría
-            self.accounts_table.setItem(row, 4, QTableWidgetItem(account.category))
+            self.accounts_table.setItem(row, 3, QTableWidgetItem(account.category))
             
             # Acciones
             actions_widget = QWidget()
@@ -806,7 +812,7 @@ class HomeWindow(QMainWindow):
             actions_layout.addWidget(delete_btn)
             actions_layout.addStretch()
             
-            self.accounts_table.setCellWidget(row, 5, actions_widget)
+            self.accounts_table.setCellWidget(row, 4, actions_widget)
             
             # Ajustar altura de la fila
             self.accounts_table.setRowHeight(row, 60)
@@ -820,13 +826,22 @@ class HomeWindow(QMainWindow):
         
         # Última actualización
         if accounts:
-            last_updates = [datetime.fromisoformat(acc.last_modified) for acc in accounts]
-            last_update = max(last_updates)
-            last_update_str = last_update.strftime("%d/%m/%Y %H:%M")
+            last_updates = []
+            for acc in accounts:
+                if acc.updated_at:
+                    last_updates.append(datetime.fromisoformat(acc.updated_at))
+                elif acc.created_at:
+                    last_updates.append(datetime.fromisoformat(acc.created_at))
+            
+            if last_updates:
+                last_update = max(last_updates)
+                last_update_str = last_update.strftime("%d/%m/%Y %H:%M")
+            else:
+                last_update_str = "Nunca"
         else:
             last_update_str = "Nunca"
         
-        last_label = self.total_accounts_label.parent().findChild(QLabel, "última_actualización_value")
+        last_label = self.last_update_label.findChild(QLabel, "última_actualización_value")
         if last_label:
             last_label.setText(last_update_str)
         
@@ -839,7 +854,7 @@ class HomeWindow(QMainWindow):
         else:
             category_str = "N/A"
         
-        category_label = self.total_accounts_label.parent().findChild(QLabel, "categoría_principal_value")
+        category_label = self.top_category_label.findChild(QLabel, "categoría_principal_value")
         if category_label:
             category_label.setText(category_str)
     
@@ -848,16 +863,14 @@ class HomeWindow(QMainWindow):
         search_text = self.search_entry.text().lower()
         category_filter = self.category_filter.currentText()
         
-        all_accounts = self.account_manager.get_all_accounts()
         filtered_accounts = []
         
-        for account in all_accounts:
+        for account in self.accounts_list:
             # Filtro de búsqueda
             if search_text:
                 if not any([
-                    search_text in account.name.lower(),
-                    search_text in account.username.lower(),
-                    search_text in (account.url or "").lower(),
+                    search_text in account.platform.lower(),
+                    search_text in account.email_or_username.lower(),
                     search_text in (account.notes or "").lower()
                 ]):
                     continue
@@ -882,7 +895,7 @@ class HomeWindow(QMainWindow):
             password_item.setText(real_password)
             
             # Cambiar icono del botón
-            actions_widget = self.accounts_table.cellWidget(row, 5)
+            actions_widget = self.accounts_table.cellWidget(row, 4)
             view_btn = actions_widget.findChildren(QPushButton)[0]
             view_btn.setText("🙈")
         else:
@@ -890,7 +903,7 @@ class HomeWindow(QMainWindow):
             password_item.setText("••••••••")
             
             # Cambiar icono del botón
-            actions_widget = self.accounts_table.cellWidget(row, 5)
+            actions_widget = self.accounts_table.cellWidget(row, 4)
             view_btn = actions_widget.findChildren(QPushButton)[0]
             view_btn.setText("👁")
     
@@ -916,9 +929,18 @@ class HomeWindow(QMainWindow):
         dialog = AccountDialog(self, account)
         if dialog.exec():
             try:
-                # Actualizar cuenta
+                # Actualizar cuenta - usar el índice para actualizar
                 updated_account = Account(**dialog.account_data)
-                self.account_manager.update_account(updated_account.id, updated_account)
+                
+                # Encontrar el índice de la cuenta en la lista
+                account_index = None
+                for i, acc in enumerate(self.accounts_list):
+                    if acc.id == account.id:
+                        account_index = i
+                        break
+                
+                if account_index is not None:
+                    self.account_manager.update_account(account_index, updated_account)
                 
                 # Recargar tabla
                 self.load_accounts()
@@ -933,7 +955,7 @@ class HomeWindow(QMainWindow):
         # Diálogo de confirmación
         msg = QMessageBox(self)
         msg.setWindowTitle("Confirmar Eliminación")
-        msg.setText(f"¿Está seguro de que desea eliminar la cuenta '{account.name}'?")
+        msg.setText(f"¿Está seguro de que desea eliminar la cuenta '{account.platform}'?")
         msg.setInformativeText("Esta acción no se puede deshacer.")
         msg.setIcon(QMessageBox.Icon.Question)
         msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
@@ -960,7 +982,16 @@ class HomeWindow(QMainWindow):
         
         if msg.exec() == QMessageBox.StandardButton.Yes:
             try:
-                self.account_manager.delete_account(account.id)
+                # Encontrar el índice de la cuenta
+                account_index = None
+                for i, acc in enumerate(self.accounts_list):
+                    if acc.id == account.id:
+                        account_index = i
+                        break
+                
+                if account_index is not None:
+                    self.account_manager.delete_account(account_index)
+                
                 self.load_accounts()
                 self.show_message("Éxito", "Cuenta eliminada correctamente", "info")
             except Exception as e:
@@ -1045,32 +1076,33 @@ def start_home(admin_user, fernet_key):
     admin_user: usuario autenticado
     fernet_key: clave Fernet para encriptación
     """
+    # NO crear una nueva aplicación, usar la existente
     app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
     
-    # Configurar estilo global
-    app.setStyleSheet("""
-        QApplication {
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-        QToolTip {
-            background-color: #2d2d2d;
-            color: white;
-            border: 1px solid #404040;
-            padding: 5px;
-            border-radius: 4px;
-        }
-    """)
+    # Solo aplicar estilos si no se han aplicado antes
+    if app:
+        app.setStyleSheet("""
+            QApplication {
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QToolTip {
+                background-color: #2d2d2d;
+                color: white;
+                border: 1px solid #404040;
+                padding: 5px;
+                border-radius: 4px;
+            }
+        """)
     
+    # Crear y mostrar la ventana Home
     home = HomeWindow(admin_user, fernet_key)
     home.show()
     
-    sys.exit(app.exec())
+
+    return home 
 
 
 if __name__ == "__main__":
-    # Para pruebas - simular usuario y clave
     from Modelo.models import AdminUser
     from cryptography.fernet import Fernet
     
@@ -1083,4 +1115,7 @@ if __name__ == "__main__":
     
     test_key = Fernet.generate_key()
     
-    start_home(test_user, test_key)
+    app = QApplication(sys.argv)
+    home = HomeWindow(test_user, test_key)
+    home.show()
+    sys.exit(app.exec())

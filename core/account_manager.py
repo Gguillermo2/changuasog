@@ -3,7 +3,7 @@ from datetime import datetime
 from Modelo.models import Account
 from core.almacenamiento import save_accounts_data, load_accounts_data
 from core.seguridad import generate_strong_password
-
+#Modificaciones
 class AccountManager:
     """Gestor CRUD para las cuentas de usuario"""
     
@@ -96,6 +96,10 @@ class AccountManager:
         categories = set(acc.category for acc in self.accounts)
         return sorted(list(categories))
     
+    def get_all_accounts(self) -> list:
+        """Obtiene todas las cuentas"""
+        return self.accounts
+        
     def get_accounts_summary(self) -> dict:
         """Obtiene un resumen de las cuentas"""
         summary = {
